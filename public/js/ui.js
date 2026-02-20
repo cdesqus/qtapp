@@ -626,10 +626,11 @@ class UI {
                     </div>
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Category</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Unit</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Remarks</span>
@@ -678,7 +679,7 @@ class UI {
                         margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
                         remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
                         category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
-                        unit: 'Pcs'
+                        unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
                     });
                 });
 
@@ -729,13 +730,15 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '120px 3fr 80px 140px 90px 2fr 40px';
+        row.style.gridTemplateColumns = '120px 3fr 80px 80px 140px 90px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
         row.dataset.index = idx;
 
         const activeCat = productCategory || 'Barang';
+        const activeUnit = (item ? item.unit : '') || 'Pcs';
+        const unitOptions = (window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr']).map(u => `<option value="${u}" ${u === activeUnit ? 'selected' : ''}>${u}</option>`).join('');
 
         row.innerHTML = `
             <select name="items[${idx}][category]" onchange="window.ui.onCategoryChange(${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
@@ -751,6 +754,9 @@ class UI {
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
+            <select name="items[${idx}][unit]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
+                ${unitOptions}
+            </select>
             <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : 15}" placeholder="15" min="0" max="100" step="0.5" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
