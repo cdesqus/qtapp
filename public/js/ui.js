@@ -435,9 +435,9 @@ class UI {
                     </div>
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 120px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Category</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
@@ -473,7 +473,7 @@ class UI {
                         price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
                         margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
                         remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                        category: row.querySelector(`input[name="items[${idx}][category]"]`).value || 'Barang',
+                        category: row.querySelector(`.cat-btn-group[data-idx="${idx}"] .cat-btn.active`)?.dataset.cat || 'Barang',
                         unit: 'Pcs'
                     });
                 });
@@ -521,13 +521,27 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '3fr 120px 80px 140px 90px 2fr 40px';
+        row.style.gridTemplateColumns = '120px 3fr 80px 140px 90px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
         row.dataset.index = idx;
 
+        const activeCat = productCategory || 'Barang';
+
         row.innerHTML = `
+            <div class="cat-btn-group" data-idx="${idx}" style="display: flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); height: 36px;">
+                <button type="button" class="cat-btn ${activeCat === 'Barang' ? 'active' : ''}" data-cat="Barang" onclick="window.ui.toggleCategory(${idx}, 'Barang')"
+                    style="flex:1; border:none; padding: 0 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+                    ${activeCat === 'Barang' ? 'background: var(--primary); color: white;' : 'background: #f8fafc; color: var(--text-secondary);'}">
+                    Barang
+                </button>
+                <button type="button" class="cat-btn ${activeCat === 'Service' ? 'active' : ''}" data-cat="Service" onclick="window.ui.toggleCategory(${idx}, 'Service')"
+                    style="flex:1; border:none; border-left: 1px solid var(--border-color); padding: 0 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+                    ${activeCat === 'Service' ? 'background: #8b5cf6; color: white;' : 'background: #f8fafc; color: var(--text-secondary);'}">
+                    Service
+                </button>
+            </div>
             <div style="position: relative;">
                 <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
                     oninput="window.ui.onProductSearch(this, ${idx})"
@@ -536,8 +550,6 @@ class UI {
                 <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
-            <input type="text" name="items[${idx}][category]" value="${productCategory}" readonly
-                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f8fafc; color: var(--text-secondary); text-align: center;">
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : 15}" placeholder="15" min="0" max="100" step="0.5" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
@@ -560,10 +572,23 @@ class UI {
         const dropdown = document.getElementById(`product-dropdown-${idx}`);
         if (!dropdown) return;
 
+        // Get selected category from toggle buttons
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        const activeCatBtn = row?.querySelector(`.cat-btn-group[data-idx="${idx}"] .cat-btn.active`);
+        const selectedCat = activeCatBtn?.dataset.cat || '';
+
         const products = window.store.products || [];
-        const filtered = query.length === 0 ? products : products.filter(p =>
-            p.name.toLowerCase().includes(query) || (p.category || '').toLowerCase().includes(query)
-        );
+        let filtered = products;
+
+        // Filter by category if selected
+        if (selectedCat) {
+            filtered = filtered.filter(p => (p.category || '') === selectedCat);
+        }
+
+        // Then filter by search query
+        if (query.length > 0) {
+            filtered = filtered.filter(p => p.name.toLowerCase().includes(query));
+        }
 
         if (filtered.length === 0) {
             dropdown.innerHTML = '<div style="padding: 10px 12px; color: var(--text-secondary); font-size: 0.85rem;">No products found</div>';
@@ -582,6 +607,30 @@ class UI {
         dropdown.style.display = 'block';
     }
 
+    toggleCategory(idx, cat) {
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        if (!row) return;
+        const group = row.querySelector(`.cat-btn-group[data-idx="${idx}"]`);
+        if (!group) return;
+
+        group.querySelectorAll('.cat-btn').forEach(btn => {
+            const isCurrent = btn.dataset.cat === cat;
+            btn.classList.toggle('active', isCurrent);
+            if (btn.dataset.cat === 'Barang') {
+                btn.style.background = isCurrent ? 'var(--primary)' : '#f8fafc';
+                btn.style.color = isCurrent ? 'white' : 'var(--text-secondary)';
+            } else {
+                btn.style.background = isCurrent ? '#8b5cf6' : '#f8fafc';
+                btn.style.color = isCurrent ? 'white' : 'var(--text-secondary)';
+            }
+        });
+
+        // Clear selected product when category changes
+        row.querySelector(`input[name="items[${idx}][search]"]`).value = '';
+        row.querySelector(`input[name="items[${idx}][itemId]"]`).value = '';
+        row.querySelector(`input[name="items[${idx}][price]"]`).value = 0;
+    }
+
     selectProduct(idx, productId) {
         const product = window.store.products.find(p => p.id === productId);
         if (!product) return;
@@ -592,8 +641,16 @@ class UI {
         // Set values
         row.querySelector(`input[name="items[${idx}][search]"]`).value = product.name;
         row.querySelector(`input[name="items[${idx}][itemId]"]`).value = product.id;
-        row.querySelector(`input[name="items[${idx}][category]"]`).value = product.category || '';
         row.querySelector(`input[name="items[${idx}][price]"]`).value = product.price || 0;
+
+        // Auto-activate matching category button
+        if (product.category) {
+            this.toggleCategory(idx, product.category);
+            // Re-set product name since toggleCategory clears it
+            row.querySelector(`input[name="items[${idx}][search]"]`).value = product.name;
+            row.querySelector(`input[name="items[${idx}][itemId]"]`).value = product.id;
+            row.querySelector(`input[name="items[${idx}][price]"]`).value = product.price || 0;
+        }
 
         // Close dropdown
         const dropdown = document.getElementById(`product-dropdown-${idx}`);
