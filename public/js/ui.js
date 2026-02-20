@@ -95,7 +95,7 @@ class UI {
                     <div class="table-container">
                         <table>
                             <thead>
-                                <tr><th>Name</th><th>Email</th><th>NPWP</th><th>Actions</th></tr>
+                                <tr><th>Name</th><th>Email</th><th>Nomor NPWP</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
                                 ${clients.length === 0 ? '<tr><td colspan="4" style="text-align:center">No clients found</td></tr>' :
@@ -103,7 +103,7 @@ class UI {
                                     <tr>
                                         <td>${c.name}</td>
                                         <td>${c.email || '-'}</td>
-                                        <td>${c.npwp ? '✅' : '❌'}</td>
+                                        <td>${c.npwpNumber || '-'}</td>
                                         <td>
                                             <button class="btn btn-sm btn-secondary" onclick="window.ui.openClientForm('${c.id}')"><i class="fa-solid fa-edit"></i></button>
                                             <button class="btn btn-sm btn-error" onclick="window.ui.deleteClient('${c.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -302,7 +302,7 @@ class UI {
     }
 
     openClientForm(id = null) {
-        const client = id ? window.store.clients.find(c => c.id === id) : { name: '', email: '', address: '', npwp: false, npwpNumber: '' };
+        const client = id ? window.store.clients.find(c => c.id === id) : { name: '', email: '', address: '', npwpNumber: '' };
         if (!client) return;
         const content = `
             <h3>${id ? 'Edit' : 'New'} Client</h3>
@@ -311,10 +311,8 @@ class UI {
                 <div class="form-group"><label>Email</label><input type="email" name="email" value="${client.email || ''}"></div>
                 <div class="form-group"><label>Address</label><textarea name="address">${client.address || ''}</textarea></div>
                 <div class="form-group">
-                    <label><input type="checkbox" name="npwp" ${client.npwp ? 'checked' : ''} onchange="document.getElementById('npwp-number-group').style.display = this.checked ? 'block' : 'none'"> Has NPWP</label>
-                </div>
-                <div id="npwp-number-group" class="form-group" style="display: ${client.npwp ? 'block' : 'none'}">
-                    <label>NPWP Number</label><input type="text" name="npwpNumber" value="${client.npwpNumber || ''}">
+                    <label>Nomor NPWP</label>
+                    <input type="text" name="npwpNumber" value="${client.npwpNumber || ''}" placeholder="Masukkan Nomor NPWP (opsional)">
                 </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn btn-primary">Save Client</button>
@@ -326,12 +324,13 @@ class UI {
         document.getElementById('client-form').onsubmit = async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
+            const npwpVal = (formData.get('npwpNumber') || '').trim();
             const data = {
                 name: formData.get('name'),
                 email: formData.get('email'),
                 address: formData.get('address'),
-                npwp: formData.get('npwp') === 'on',
-                npwpNumber: formData.get('npwpNumber')
+                npwp: npwpVal.length > 0,
+                npwpNumber: npwpVal
             };
             try {
                 if (id) await window.store.updateClient(id, data);
