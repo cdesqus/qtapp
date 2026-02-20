@@ -342,7 +342,6 @@ app.post('/api/transactions', authenticate, async (req, res) => {
             const dup = await client.query('SELECT id FROM transactions WHERE customer_po = $1', [customerPo]);
             if (dup.rows.length > 0) {
                 await client.query('ROLLBACK');
-                client.release();
                 return res.status(400).json({ error: `Nomor PO "${customerPo}" sudah digunakan di transaksi lain.` });
             }
         }
@@ -397,7 +396,6 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
             const dup = await client.query('SELECT id FROM transactions WHERE customer_po = $1 AND id != $2', [customerPo, id]);
             if (dup.rows.length > 0) {
                 await client.query('ROLLBACK');
-                client.release();
                 return res.status(400).json({ error: `Nomor PO "${customerPo}" sudah digunakan di transaksi lain.` });
             }
         }

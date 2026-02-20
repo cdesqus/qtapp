@@ -267,16 +267,24 @@ class Store {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...transaction, items })
         });
+        if (res && !res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Gagal menyimpan transaksi');
+        }
         await this.loadTransactions();
         return await (res ? res.json() : null);
     }
 
     async updateTransaction(id, data, items) {
-        await this.apiFetch(`${API_URL}/api/transactions/${id}`, {
+        const res = await this.apiFetch(`${API_URL}/api/transactions/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...data, items })
         });
+        if (res && !res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Gagal mengupdate transaksi');
+        }
         await this.loadTransactions();
     }
 
