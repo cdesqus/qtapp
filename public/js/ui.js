@@ -162,6 +162,7 @@ class UI {
         try {
             const container = document.getElementById('content-area');
             const txs = (window.store.transactions || []).filter(t => t.type === type);
+            const isQuo = type === 'QUO';
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header">
@@ -171,20 +172,27 @@ class UI {
                     <div class="table-container">
                         <table>
                             <thead>
-                                <tr><th>Date</th><th>Number</th><th>Client</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Date</th><th>Number</th>${isQuo ? '<th>PO Number</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
-                                ${txs.length === 0 ? `<tr><td colspan="5" style="text-align:center">No ${type} found</td></tr>` :
+                                ${txs.length === 0 ? `<tr><td colspan="${isQuo ? 6 : 5}" style="text-align:center">No ${type} found</td></tr>` :
                     txs.map(t => `
                                     <tr>
                                         <td>${window.formatDate(t.date)}</td>
                                         <td>${t.docNumber || '-'}</td>
+                                        ${isQuo ? `<td>${t.customerPo ? `<span style="padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;background:rgba(34,197,94,0.15);color:#16a34a;">${t.customerPo}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">-</span>'}</td>` : ''}
                                         <td>${t.clientName || '-'}</td>
                                         <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
-                                        <td>
-                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.openTransactionForm('${type}', '${t.id}')"><i class="fa-solid fa-edit"></i></button>
-                                            <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${t.id}')"><i class="fa-solid fa-print"></i></button>
-                                            <button class="btn btn-sm btn-error" onclick="window.ui.deleteTransaction('${t.id}', '${type}')"><i class="fa-solid fa-trash"></i></button>
+                                        <td style="white-space: nowrap;">
+                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.openTransactionForm('${type}', '${t.id}')" title="Edit"><i class="fa-solid fa-edit"></i></button>
+                                            <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${t.id}')" title="Print"><i class="fa-solid fa-print"></i></button>
+                                            ${isQuo ? `
+                                                <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);" onclick="window.ui.confirmPO('${t.id}')" title="Confirm PO"><i class="fa-solid fa-check-circle"></i> PO</button>
+                                                <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'DO')" title="To DO">→DO</button>
+                                                <button class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'BAP')" title="To BAST">→BAST</button>
+                                                <button class="btn btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'INV')" title="To Invoice">→INV</button>
+                                            ` : ''}
+                                            <button class="btn btn-sm btn-error" onclick="window.ui.deleteTransaction('${t.id}', '${type}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -603,7 +611,7 @@ class UI {
                 <h3>${id ? 'Edit' : 'New'} ${type}</h3>
                 <form id="transaction-form">
                     <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                        <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required></div>
+                        <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required ${!id ? 'readonly style="background:#f1f5f9; cursor:not-allowed;"' : ''}></div>
                         <div class="form-group"><label>Date</label><input type="date" name="date" value="${tx.date.split('T')[0]}" required></div>
                         <div class="form-group">
                             <label>Client</label>
@@ -849,6 +857,80 @@ class UI {
         } else {
             alert('PDF Generator not loaded.');
         }
+    }
+
+    confirmPO(txId) {
+        const tx = (window.store.transactions || []).find(t => t.id === txId);
+        const content = `
+            <h3>Confirm Purchase Order</h3>
+            <p style="margin-bottom:15px; color: var(--text-secondary);">Quotation: <strong>${tx?.docNumber || '-'}</strong></p>
+            <form id="confirm-po-form">
+                <div class="form-group">
+                    <label>Customer PO Number</label>
+                    <input type="text" name="poNumber" required placeholder="Enter customer PO number" value="${tx?.customerPo || ''}">
+                </div>
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check-circle"></i> Confirm PO</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                </div>
+            </form>
+        `;
+        this.openModal(content);
+        document.getElementById('confirm-po-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const poNumber = new FormData(e.target).get('poNumber');
+            try {
+                const fullTx = await window.store.getTransaction(txId);
+                await window.store.updateTransaction(txId, {
+                    ...fullTx,
+                    customerPo: poNumber,
+                    status: 'PO'
+                }, fullTx.items);
+                this.closeModal();
+                this.renderTransactions('QUO');
+            } catch (err) { alert('Gagal confirm PO: ' + err.message); }
+        };
+    }
+
+    async convertTransaction(sourceId, targetType) {
+        try {
+            const source = await window.store.getTransaction(sourceId);
+            if (!source) return alert('Source transaction not found');
+
+            const newDocNumber = window.store.generateNextDocNumber(targetType);
+            const items = (source.items || []).map(item => ({
+                itemId: item.itemId || item.item_id,
+                category: item.category,
+                qty: item.qty,
+                unit: item.unit,
+                sn: item.sn,
+                remarks: item.remarks,
+                cost: item.cost,
+                margin: item.margin,
+                price: item.price
+            }));
+
+            const data = {
+                type: targetType,
+                docNumber: newDocNumber,
+                customerPo: source.customerPo,
+                date: new Date().toISOString().split('T')[0],
+                clientId: source.clientId,
+                terms: source.terms,
+                status: 'Draft'
+            };
+
+            await window.store.addTransaction(data, items);
+
+            const typeName = { DO: 'Delivery Order', BAP: 'BAST', INV: 'Invoice' };
+            alert(`${typeName[targetType] || targetType} created: ${newDocNumber}`);
+
+            // Navigate to the target type list
+            const menuMap = { DO: 'delivery-orders', BAP: 'bap', INV: 'invoices' };
+            if (menuMap[targetType]) {
+                document.querySelector(`[data-page="${menuMap[targetType]}"]`)?.click();
+            }
+        } catch (err) { alert('Gagal convert: ' + err.message); }
     }
 }
 
