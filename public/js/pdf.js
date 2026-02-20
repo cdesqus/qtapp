@@ -340,14 +340,14 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 // ═══════════════════════════════════════════════════════════
 function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     const DO_COLORS = {
-        PRIMARY: [0, 151, 178],     // Cyan/teal brand accent
-        PRIMARY_DARK: [0, 120, 145],
+        PRIMARY: [0, 82, 155],       // Deep blue (same as Quotation)
+        PRIMARY_DARK: [0, 65, 130],
         DARK: [30, 41, 59],
         SECONDARY: [100, 116, 139],
-        LIGHT_BG: [240, 253, 255],  // Very light cyan tint
+        LIGHT_BG: [248, 250, 252],   // Slate-50 row shading
         WHITE: [255, 255, 255],
-        BORDER: [203, 230, 237],    // Soft cyan border
-        ACCENT: [0, 188, 212],      // Bright cyan accent
+        BORDER: [226, 232, 240],     // Slate-200
+        ACCENT: [0, 82, 155],       // Deep blue accent
     };
 
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
