@@ -42,10 +42,11 @@ const printPDF = async (id) => {
         generateQuotationPDF(jsPDF, tx, settings, client);
     } else if (tx.type === 'DO') {
         generateDeliveryOrderPDF(jsPDF, tx, settings, client);
+    } else if (tx.type === 'BAP') {
+        generateBASTPDF(jsPDF, tx, settings, client);
     } else if (tx.type === 'INV') {
         generateInvoicePDF(jsPDF, tx, settings, client);
     } else {
-        // Fallback for BAST, etc.
         const doc = new jsPDF();
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
@@ -620,6 +621,401 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     // ── Save ──
     doc.save(`${tx.docNumber || 'DeliveryOrder'}.pdf`);
 }
+
+// ═══════════════════════════════════════════════════════════
+//  BAST (HANDOVER PROTOCOL) PDF
+// ═══════════════════════════════════════════════════════════
+function generateBASTPDF(jsPDF, tx, settings, client) {
+    const C = {
+        PRIMARY: [0, 82, 155],
+        PRIMARY_D: [0, 65, 130],
+        DARK: [30, 41, 59],
+        SECONDARY: [100, 116, 139],
+        LIGHT_BG: [248, 250, 252],
+        WHITE: [255, 255, 255],
+        BORDER: [226, 232, 240],
+        SUCCESS: [22, 163, 74],
+        SUCCESS_BG: [220, 252, 231],
+        ACCENT2: [59, 130, 246],
+    };
+
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const mL = 18, mR = 18;
+    const W = pageW - mL - mR;
+    let y = 18;
+
+    // ─────────────────────────────────────────────────
+    //  WATERMARK – low-opacity logo in center
+    // ─────────────────────────────────────────────────
+    if (settings.logo) {
+        try {
+            const wmSize = 90;
+            const wmX = (pageW - wmSize) / 2;
+            const wmY = (pageH - wmSize) / 2;
+            doc.saveGraphicsState();
+            doc.setGState(new doc.GState({ opacity: 0.04 }));
+            doc.addImage(settings.logo, 'AUTO', wmX, wmY, wmSize, wmSize);
+            doc.restoreGraphicsState();
+        } catch (e) { /* logo unavailable */ }
+    }
+
+    // ─────────────────────────────────────────────────
+    //  HUD corner accents (decorative)
+    // ─────────────────────────────────────────────────
+    const hudLen = 12;
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.5);
+    // Top-left
+    doc.line(mL, y - 4, mL + hudLen, y - 4);
+    doc.line(mL, y - 4, mL, y - 4 + hudLen);
+    // Top-right
+    doc.line(pageW - mR - hudLen, y - 4, pageW - mR, y - 4);
+    doc.line(pageW - mR, y - 4, pageW - mR, y - 4 + hudLen);
+
+    // ─────────────────────────────────────────────────
+    //  HEADER – Centered logo + company + title
+    // ─────────────────────────────────────────────────
+    const logoH = 18;
+    if (settings.logo) {
+        try {
+            doc.addImage(settings.logo, 'AUTO', (pageW - 18) / 2, y, 18, logoH);
+        } catch (e) { }
+    }
+    y += logoH + 4;
+
+    // Company name
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', pageW / 2, y, { align: 'center' });
+    y += 4;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.SECONDARY);
+    let addrText = (settings.address || '').replace(/\n/g, '  ·  ');
+    if (settings.phone) addrText += `  ·  ${settings.phone}`;
+    doc.text(addrText, pageW / 2, y, { align: 'center' });
+    y += 10;
+
+    // Title: HANDOVER PROTOCOL
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('HANDOVER PROTOCOL', pageW / 2, y, { align: 'center' });
+    y += 2;
+
+    // Navy blue underline accent
+    const titleW = doc.getTextWidth('HANDOVER PROTOCOL');
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(1.0);
+    doc.line((pageW - titleW) / 2, y, (pageW + titleW) / 2, y);
+    y += 10;
+
+    // ─────────────────────────────────────────────────
+    //  REFERENCE INFO GRID
+    // ─────────────────────────────────────────────────
+    // Draw info box with HUD-style border
+    const infoBoxH = 32;
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(mL, y, W, infoBoxH, 2, 2, 'S');
+
+    // Vertical divider
+    const midX = pageW / 2;
+    doc.setDrawColor(...C.BORDER);
+    doc.line(midX, y + 4, midX, y + infoBoxH - 4);
+
+    // Left column – Client info
+    let ly = y + 8;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('RECIPIENT', mL + 6, ly);
+    ly += 5;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(...C.DARK);
+    doc.text(client?.name || tx.clientName || '-', mL + 6, ly);
+    ly += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.SECONDARY);
+    if (client?.address) {
+        const cAddr = doc.splitTextToSize(client.address, midX - mL - 14);
+        doc.text(cAddr, mL + 6, ly);
+    }
+
+    // Right column – Document info
+    let ry = y + 8;
+    const rL = midX + 6;
+    const rR = pageW - mR - 6;
+
+    const drawRef = (label, value) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.SECONDARY);
+        doc.text(label, rL, ry);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.DARK);
+        doc.text(value, rR, ry, { align: 'right' });
+        ry += 5.5;
+    };
+
+    drawRef('Document No.', tx.docNumber || '-');
+    drawRef('Date', fmtDate(tx.date));
+    drawRef('PO Reference', tx.customerPo || '-');
+
+    y += infoBoxH + 8;
+
+    // Opening statement referencing PO
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.DARK);
+    const openingText = `In accordance with Purchase Order ${tx.customerPo ? '"' + tx.customerPo + '"' : '(ref. above)'}, the following items/services have been completed and are hereby handed over for acceptance:`;
+    const openingLines = doc.splitTextToSize(openingText, W);
+    doc.text(openingLines, mL, y);
+    y += openingLines.length * 4 + 4;
+
+    // ─────────────────────────────────────────────────
+    //  ITEM TABLE – HUD grid style with status badges
+    // ─────────────────────────────────────────────────
+    const items = tx.items || [];
+    const resolvedItems = items.map(item => {
+        let name = item.itemName || item.item_name || '';
+        if (!name && item.itemId) {
+            const prod = window.store.products.find(p => p.id === item.itemId);
+            if (prod) name = prod.name;
+        }
+        return { ...item, resolvedName: name };
+    });
+
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'S/N', 'REMARKS', 'STATUS']];
+    const tableBody = resolvedItems.map((item, i) => [
+        String(i + 1),
+        item.resolvedName || '-',
+        String(item.qty || 0),
+        item.sn || '-',
+        item.remarks || '-',
+        'Completed'
+    ]);
+
+    doc.autoTable({
+        startY: y,
+        head: tableHeaders,
+        body: tableBody,
+        theme: 'plain',
+        margin: { left: mL, right: mR },
+        tableWidth: W,
+        styles: {
+            font: 'helvetica',
+            fontSize: 8.5,
+            cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+            textColor: C.DARK,
+            lineColor: C.BORDER,
+            lineWidth: 0.15,
+            valign: 'middle'
+        },
+        headStyles: {
+            fillColor: C.PRIMARY,
+            textColor: C.WHITE,
+            fontStyle: 'bold',
+            fontSize: 7.5,
+            halign: 'center',
+            lineWidth: 0
+        },
+        columnStyles: {
+            0: { cellWidth: 12, halign: 'center' },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 16, halign: 'center' },
+            3: { cellWidth: 32 },
+            4: { cellWidth: 34 },
+            5: { cellWidth: 24, halign: 'center', fontStyle: 'bold' }
+        },
+        alternateRowStyles: {
+            fillColor: C.LIGHT_BG
+        },
+        didParseCell: (data) => {
+            // Style the STATUS column with badge colors
+            if (data.section === 'body' && data.column.index === 5) {
+                data.cell.styles.textColor = C.SUCCESS;
+                data.cell.styles.fillColor = C.SUCCESS_BG;
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fontSize = 7;
+            }
+        },
+        didDrawCell: (data) => {
+            // HUD-style corner ticks on header cells
+            if (data.section === 'head') {
+                const { x, y: cy, width: cw, height: ch } = data.cell;
+                doc.setDrawColor(...C.ACCENT2);
+                doc.setLineWidth(0.3);
+                const tk = 2;
+                // top-left tick
+                doc.line(x, cy, x + tk, cy);
+                doc.line(x, cy, x, cy + tk);
+                // top-right tick
+                doc.line(x + cw, cy, x + cw - tk, cy);
+                doc.line(x + cw, cy, x + cw, cy + tk);
+            }
+        }
+    });
+
+    y = doc.lastAutoTable.finalY + 10;
+
+    // ─────────────────────────────────────────────────
+    //  LEGAL STATEMENT
+    // ─────────────────────────────────────────────────
+    // Accent bar on left
+    const stmtH = 16;
+    doc.setFillColor(...C.PRIMARY);
+    doc.rect(mL, y - 2, 2, stmtH, 'F');
+
+    // Background
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(mL + 4, y - 2, W - 4, stmtH, 1.5, 1.5, 'F');
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.DARK);
+    const legalText = 'By signing this document, the Recipient acknowledges that the items/services mentioned above have been received in good condition and fulfill the agreed specifications.';
+    const legalLines = doc.splitTextToSize(legalText, W - 14);
+    doc.text(legalLines, mL + 8, y + 3);
+
+    y += stmtH + 12;
+
+    // ─────────────────────────────────────────────────
+    //  SIGNATURE AREA – Deliverer & Receiver
+    // ─────────────────────────────────────────────────
+    const sigNeeded = 65;
+    if (y + sigNeeded > pageH - 15) {
+        doc.addPage();
+        y = 25;
+        // Re-draw watermark on new page
+        if (settings.logo) {
+            try {
+                doc.saveGraphicsState();
+                doc.setGState(new doc.GState({ opacity: 0.04 }));
+                doc.addImage(settings.logo, 'AUTO', (pageW - 90) / 2, (pageH - 90) / 2, 90, 90);
+                doc.restoreGraphicsState();
+            } catch (e) { }
+        }
+    }
+
+    // Column layout
+    const sigColW = (W - 30) / 2;
+    const sigLX = mL + sigColW / 2 + 5;
+    const sigRX = pageW - mR - sigColW / 2 - 5;
+
+    // HUD box for each signature
+    const sigBoxW = sigColW + 10;
+    const sigBoxH = 52;
+
+    // Left signature box
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(mL, y, sigBoxW, sigBoxH, 2, 2, 'S');
+
+    // HUD corner marks on left box
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.6);
+    const bk = 5;
+    doc.line(mL, y, mL + bk, y);
+    doc.line(mL, y, mL, y + bk);
+    doc.line(mL + sigBoxW, y, mL + sigBoxW - bk, y);
+    doc.line(mL + sigBoxW, y, mL + sigBoxW, y + bk);
+
+    // Right signature box
+    const rBoxX = pageW - mR - sigBoxW;
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(rBoxX, y, sigBoxW, sigBoxH, 2, 2, 'S');
+
+    // HUD corner marks on right box
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.6);
+    doc.line(rBoxX, y, rBoxX + bk, y);
+    doc.line(rBoxX, y, rBoxX, y + bk);
+    doc.line(rBoxX + sigBoxW, y, rBoxX + sigBoxW - bk, y);
+    doc.line(rBoxX + sigBoxW, y, rBoxX + sigBoxW, y + bk);
+
+    // Headers
+    let sy = y + 7;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('HANDED OVER BY', sigLX, sy, { align: 'center' });
+    doc.text('ACCEPTED BY', sigRX, sy, { align: 'center' });
+
+    sy += 3.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Deliverer', sigLX, sy, { align: 'center' });
+    doc.text('Receiver', sigRX, sy, { align: 'center' });
+
+    // Signature space
+    sy += 25;
+
+    // Signature lines
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.4);
+    doc.line(sigLX - 25, sy, sigLX + 25, sy);
+    doc.line(sigRX - 25, sy, sigRX + 25, sy);
+
+    sy += 4;
+
+    // Names
+    const currentUser = window.store.currentUser;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.DARK);
+    doc.text(currentUser?.username || 'Authorized', sigLX, sy, { align: 'center' });
+    doc.text('(                                    )', sigRX, sy, { align: 'center' });
+
+    sy += 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigLX, sy, { align: 'center' });
+    doc.text(client?.name || 'Customer', sigRX, sy, { align: 'center' });
+
+    // ─────────────────────────────────────────────────
+    //  FOOTER – HUD accent line
+    // ─────────────────────────────────────────────────
+    const footY = pageH - 10;
+
+    // HUD footer corners
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.5);
+    // Bottom-left
+    doc.line(mL, footY + 5, mL + hudLen, footY + 5);
+    doc.line(mL, footY + 5, mL, footY + 5 - hudLen);
+    // Bottom-right
+    doc.line(pageW - mR - hudLen, footY + 5, pageW - mR, footY + 5);
+    doc.line(pageW - mR, footY + 5, pageW - mR, footY + 5 - hudLen);
+
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.line(mL + hudLen + 2, footY, pageW - mR - hudLen - 2, footY);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('This document constitutes official acceptance of delivered items/services. Retain for your records.', pageW / 2, footY + 3.5, { align: 'center' });
+
+    // Document ID watermark text
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(200, 200, 200);
+    doc.text(`REF: ${tx.docNumber || '-'}`, pageW / 2, footY + 7, { align: 'center' });
+
+    // ── Save ──
+    doc.save(`${tx.docNumber || 'BAST'}.pdf`);
+}
+
 
 // ═══════════════════════════════════════════════════════════
 //  INVOICE PDF  (existing logic preserved & enhanced)
