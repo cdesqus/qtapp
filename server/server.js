@@ -74,11 +74,16 @@ const pool = new Pool({
     connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/erp_db'
 });
 
-pool.connect((err, client, release) => {
+pool.connect(async (err, client, release) => {
     if (err) {
         console.error('❌ Database connection error:', err.stack);
     } else {
         console.log('✅ Connected to PostgreSQL database');
+        // Auto-migrations
+        try {
+            await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS signature TEXT');
+            console.log('✅ Database migrations applied');
+        } catch (e) { console.error('Migration warning:', e.message); }
         release();
     }
 });
