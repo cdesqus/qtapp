@@ -160,7 +160,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         return { ...item, resolvedName: name, resolvedDesc: desc };
     });
 
-    const tableHeaders = [['No.', 'Description', 'Qty', 'Unit Price', 'Amount']];
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
 
     const tableBody = resolvedItems.map((item, i) => {
         const basePrice = Number(item.price) || 0;
@@ -191,7 +191,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
             cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
             textColor: PDF_COLORS.DARK,
             lineColor: PDF_COLORS.BORDER,
-            lineWidth: 0.2,
+            lineWidth: 0.1,
             valign: 'middle'
         },
         headStyles: {
