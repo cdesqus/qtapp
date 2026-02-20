@@ -646,7 +646,7 @@ class UI {
             }
 
             // Load terms
-            const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled\n3. The price valid until 14 days';
+            const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled';
             const termsEl = document.getElementById('tx-terms');
             if (tx.terms && typeof tx.terms === 'string' && tx.terms.trim().length > 0) {
                 termsEl.value = tx.terms;

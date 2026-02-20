@@ -79,11 +79,10 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
-    const addressLines = doc.splitTextToSize(settings.address || '', 80);
+    let fullAddress = settings.address || '';
+    if (settings.phone) fullAddress += `  Phone: ${settings.phone}`;
+    const addressLines = doc.splitTextToSize(fullAddress, 105);
     doc.text(addressLines, infoX, y + 13);
-    if (settings.phone) {
-        doc.text(`Phone: ${settings.phone}`, infoX, y + 13 + addressLines.length * 3.5);
-    }
 
     // Title "QUOTATION" on the right
     doc.setFont('helvetica', 'bold');
@@ -99,12 +98,12 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.line(marginL, y, pageW - marginR, y);
     y += 10;
 
-    // ── Info Grid: Bill To (left) | Doc Info (right) ──
+    // ── Info Grid: To (left) | Doc Info (right) ──
     // Left side – Client
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
-    doc.text('BILL TO', marginL, y);
+    doc.text('TO', marginL, y);
     y += 5;
 
     doc.setFont('helvetica', 'bold');
@@ -143,7 +142,6 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
     drawInfoRow('Quotation No.', tx.docNumber || '-');
     drawInfoRow('Date', fmtDate(tx.date));
-    drawInfoRow('Valid Until', fmtDate(new Date(new Date(tx.date).getTime() + 14 * 86400000)));
 
     y = Math.max(y + 6, ry + 4);
 
@@ -222,6 +220,29 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
     y = doc.lastAutoTable.finalY + 6;
 
+    // ── TERMS & CONDITIONS (below table, before totals) ──
+    const terms = tx.terms || '';
+    if (terms.trim()) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...PDF_COLORS.PRIMARY);
+        doc.text('TERMS & CONDITIONS', marginL, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...PDF_COLORS.SECONDARY);
+
+        const termLines = terms.split('\n').filter(l => l.trim());
+        termLines.forEach(line => {
+            const wrapped = doc.splitTextToSize(line.trim(), contentW);
+            doc.text(wrapped, marginL, y);
+            y += wrapped.length * 3.5 + 1;
+        });
+
+        y += 6;
+    }
+
     // ── TOTALS ──────────────────────────
     let subtotal = 0;
     resolvedItems.forEach(item => {
@@ -249,9 +270,9 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
     drawTotalRow('Subtotal', fmtCurrency(subtotal));
 
-    // PPN 11%
+    // PPN
     const ppn = subtotal * 0.11;
-    drawTotalRow('PPN (11%)', fmtCurrency(ppn));
+    drawTotalRow('PPN', fmtCurrency(ppn));
 
     y += 1;
     const grandTotal = subtotal + ppn;
@@ -260,44 +281,15 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     y += 8;
 
     // ── Check page break ──
-    const neededSpace = 80; // estimated space for T&C + signature
+    const neededSpace = 60;
     if (y + neededSpace > doc.internal.pageSize.getHeight() - 15) {
         doc.addPage();
         y = 20;
     }
 
-    // ── TERMS & CONDITIONS ──────────────────────────
-    const terms = tx.terms || '';
-    if (terms.trim()) {
-        doc.setDrawColor(...PDF_COLORS.BORDER);
-        doc.setLineWidth(0.3);
-        doc.line(marginL, y, pageW - marginR, y);
-        y += 7;
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(...PDF_COLORS.PRIMARY);
-        doc.text('TERMS & CONDITIONS', marginL, y);
-        y += 5;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(...PDF_COLORS.SECONDARY);
-
-        const termLines = terms.split('\n').filter(l => l.trim());
-        termLines.forEach(line => {
-            const wrapped = doc.splitTextToSize(line.trim(), contentW);
-            doc.text(wrapped, marginL, y);
-            y += wrapped.length * 3.5 + 1;
-        });
-
-        y += 4;
-    }
-
-    // ── SIGNATURE AREA ──────────────────────────
+    // ── SIGNATURE AREA (Prepared by only, with logged-in user) ──
     const sigY = Math.max(y + 5, doc.internal.pageSize.getHeight() - 55);
 
-    // Check if we need a new page for signatures
     if (sigY + 40 > doc.internal.pageSize.getHeight() - 10) {
         doc.addPage();
         y = 30;
@@ -306,29 +298,38 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     }
 
     const sigLeftX = marginL + 15;
-    const sigRightX = pageW - marginR - 55;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
-
     doc.text('Prepared by,', sigLeftX, y);
-    doc.text('Accepted by,', sigRightX, y);
+
+    // Add user signature image if available
+    const currentUser = window.store.currentUser;
+    const loggedUser = (window.store.users || []).find(u => u.username === currentUser?.username);
+    if (loggedUser?.signature) {
+        try {
+            doc.addImage(loggedUser.signature, 'AUTO', sigLeftX - 2, y + 3, 40, 20);
+        } catch (e) { }
+    }
 
     y += 28;
 
-    // Signature lines
+    // Signature line
     doc.setDrawColor(...PDF_COLORS.BORDER);
     doc.setLineWidth(0.4);
     doc.line(sigLeftX - 5, y, sigLeftX + 45, y);
-    doc.line(sigRightX - 5, y, sigRightX + 45, y);
 
     y += 4;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...PDF_COLORS.DARK);
+    doc.text(currentUser?.username || 'User', sigLeftX, y);
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...PDF_COLORS.SECONDARY);
     doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigLeftX, y);
-    doc.text(client?.name || '-', sigRightX, y);
 
     // ── Save ──────────────────────────
     doc.save(`${tx.docNumber || 'Quotation'}.pdf`);
