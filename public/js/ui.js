@@ -940,7 +940,8 @@ class UI {
             const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
 
             const itemsHeader = isDO
-                ? `<div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                ? `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
                         <span style="${headerStyle}">Serial Number</span>
@@ -1081,7 +1082,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '3fr 80px 2fr 2fr 40px';
+        row.style.gridTemplateColumns = '100px 3fr 80px 2fr 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -1090,8 +1091,10 @@ class UI {
         const inputStyle = 'width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;';
 
         row.innerHTML = `
+            <select name="items[${idx}][category]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f1f5f9; cursor:not-allowed;" disabled>
+                <option value="Barang" selected>Barang</option>
+            </select>
             <div style="position: relative;">
-                <select name="items[${idx}][category]" style="display:none;"><option value="Barang" selected>Barang</option></select>
                 <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
                     oninput="window.ui.onProductSearch(this, ${idx})"
                     onfocus="window.ui.onProductSearch(this, ${idx})"
