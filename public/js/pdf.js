@@ -79,11 +79,10 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
-    const addressLines = doc.splitTextToSize(settings.address || '', 80);
+    let addrText = settings.address || '';
+    if (settings.phone) addrText += `  Phone: ${settings.phone}`;
+    const addressLines = doc.splitTextToSize(addrText, 105);
     doc.text(addressLines, infoX, y + 13);
-    if (settings.phone) {
-        doc.text(`Phone: ${settings.phone}`, infoX, y + 13 + addressLines.length * 3.5);
-    }
 
     // Title "QUOTATION" on the right
     doc.setFont('helvetica', 'bold');
