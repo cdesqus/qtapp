@@ -178,6 +178,19 @@ class Store {
         await this.loadUsers();
     }
 
+    async updateUser(id, data) {
+        const res = await this.apiFetch(`${API_URL}/api/users/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (res && !res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to update user');
+        }
+        await this.loadUsers();
+    }
+
     async saveSettings(settings) {
         await this.apiFetch(`${API_URL}/api/settings`, {
             method: 'POST',

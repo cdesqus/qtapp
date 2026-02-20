@@ -143,19 +143,19 @@ app.post('/api/logout', (req, res) => {
 // --- Users ---
 app.get('/api/users', authenticate, async (req, res) => {
     try {
-        const result = await pool.query('SELECT id, username, role FROM users ORDER BY username');
+        const result = await pool.query('SELECT id, username, role, signature FROM users ORDER BY username');
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.post('/api/users', authenticate, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
-    const { username, password, role } = req.body;
+    const { username, password, role, signature } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     try {
         const result = await pool.query(
-            'INSERT INTO users (username, password, role) VALUES ($1, $2, $3) RETURNING id, username, role',
-            [username, hashedPassword, role]
+            'INSERT INTO users (username, password, role, signature) VALUES ($1, $2, $3, $4) RETURNING id, username, role, signature',
+            [username, hashedPassword, role, signature || null]
         );
         res.json(result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -164,13 +164,13 @@ app.post('/api/users', authenticate, async (req, res) => {
 app.put('/api/users/:id', authenticate, async (req, res) => {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
     const { id } = req.params;
-    const { username, password, role } = req.body;
+    const { username, password, role, signature } = req.body;
     try {
         if (password) {
             const hashedPassword = await bcrypt.hash(password, 10);
-            await pool.query('UPDATE users SET username=$1, password=$2, role=$3 WHERE id=$4', [username, hashedPassword, role, id]);
+            await pool.query('UPDATE users SET username=$1, password=$2, role=$3, signature=$4 WHERE id=$5', [username, hashedPassword, role, signature, id]);
         } else {
-            await pool.query('UPDATE users SET username=$1, role=$2 WHERE id=$3', [username, role, id]);
+            await pool.query('UPDATE users SET username=$1, role=$2, signature=$3 WHERE id=$4', [username, role, signature, id]);
         }
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }

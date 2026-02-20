@@ -244,15 +244,19 @@ class UI {
                     </div>
                     <div class="table-container">
                         <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Username</th><th>Role</th><th>Signature</th><th>Actions</th></tr></thead>
                             <tbody>
-                                ${users.length === 0 ? '<tr><td colspan="3" style="text-align:center">No users found</td></tr>' :
+                                ${users.length === 0 ? '<tr><td colspan="4" style="text-align:center">No users found</td></tr>' :
                     users.map(u => `
                                     <tr>
                                         <td>${u.username}</td>
                                         <td><span style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; background: ${u.role === 'admin' ? 'rgba(14,165,233,0.15)' : 'rgba(100,116,139,0.15)'}; color: ${u.role === 'admin' ? '#0ea5e9' : '#64748b'};">${u.role}</span></td>
                                         <td>
-                                            <button class="btn btn-sm btn-error" onclick="window.ui.deleteUser('${u.id}', '${u.username}')" ${u.username === (window.store.currentUser?.username) ? 'disabled title="Cannot delete yourself"' : ''}><i class="fa-solid fa-trash"></i></button>
+                                            ${u.signature ? `<img src="${u.signature}" style="max-height: 36px; max-width: 80px; object-fit: contain; border: 1px solid var(--border-color); border-radius: 4px; padding: 2px; background: white;">` : '<span style="color: var(--text-secondary); font-size: 0.8rem;">No signature</span>'}
+                                        </td>
+                                        <td style="display: flex; gap: 6px;">
+                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.editUserSignature('${u.id}')" title="Edit Signature"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="btn btn-sm btn-error" onclick="window.ui.deleteUser('${u.id}', '${u.username}')" ${u.username === (window.store.currentUser?.username) ? 'disabled title="Cannot delete yourself"' : ''} title="Delete"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -279,6 +283,22 @@ class UI {
                         <option value="admin">Admin</option>
                     </select>
                 </div>
+                <div class="form-group">
+                    <label>Signature</label>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-top: 6px;">
+                        <div id="sig-preview" style="width: 120px; height: 60px; border: 2px dashed var(--border-color); border-radius: 6px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: white;">
+                            <span style="color: var(--text-secondary); font-size: 0.75rem;">No signature</span>
+                        </div>
+                        <div>
+                            <input type="file" id="sig-file-input" accept="image/*" style="display:none;" onchange="window.ui.onUserSignatureSelect(this, 'sig-preview', 'sig-data')">
+                            <button type="button" class="btn btn-sm btn-secondary" onclick="document.getElementById('sig-file-input').click()">
+                                <i class="fa-solid fa-upload"></i> Upload
+                            </button>
+                            <p style="font-size: 0.7rem; color: var(--text-secondary); margin-top: 4px;">PNG/JPG, max 1MB</p>
+                        </div>
+                    </div>
+                    <input type="hidden" id="sig-data" value="">
+                </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn btn-primary">Create User</button>
                     <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
@@ -292,7 +312,8 @@ class UI {
             const data = {
                 username: formData.get('username'),
                 password: formData.get('password'),
-                role: formData.get('role')
+                role: formData.get('role'),
+                signature: document.getElementById('sig-data').value || null
             };
             try {
                 await window.store.addUser(data);
@@ -300,6 +321,59 @@ class UI {
                 this.renderUsers();
             } catch (err) { alert("Gagal menambah user: " + err.message); }
         };
+    }
+
+    editUserSignature(userId) {
+        const user = (window.store.users || []).find(u => u.id === userId);
+        if (!user) return;
+        const content = `
+            <h3>Edit Signature — ${user.username}</h3>
+            <div style="margin-top: 15px;">
+                <div id="edit-sig-preview" style="width: 200px; height: 100px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: white; margin-bottom: 15px;">
+                    ${user.signature ? `<img src="${user.signature}" style="max-width: 100%; max-height: 100%; object-fit: contain;">` : '<span style="color: var(--text-secondary); font-size: 0.8rem;">No signature</span>'}
+                </div>
+                <input type="file" id="edit-sig-file" accept="image/*" style="display:none;" onchange="window.ui.onUserSignatureSelect(this, 'edit-sig-preview', 'edit-sig-data')">
+                <input type="hidden" id="edit-sig-data" value="${user.signature || ''}">
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('edit-sig-file').click()">
+                        <i class="fa-solid fa-upload"></i> Upload Signature
+                    </button>
+                    ${user.signature ? '<button type="button" class="btn btn-sm btn-error" onclick="document.getElementById(\'edit-sig-preview\').innerHTML=\'<span style=\\"color:var(--text-secondary);font-size:0.8rem\\"\>No signature</span>\'; document.getElementById(\'edit-sig-data\').value=\'\'"><i class="fa-solid fa-trash"></i> Remove</button>' : ''}
+                </div>
+                <div style="margin-top: 20px;">
+                    <button type="button" class="btn btn-primary" onclick="window.ui.saveUserSignature('${userId}')">Save</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                </div>
+            </div>
+        `;
+        this.openModal(content);
+    }
+
+    async saveUserSignature(userId) {
+        const user = (window.store.users || []).find(u => u.id === userId);
+        if (!user) return;
+        const sig = document.getElementById('edit-sig-data').value;
+        try {
+            await window.store.updateUser(userId, { username: user.username, role: user.role, signature: sig || null });
+            this.closeModal();
+            this.renderUsers();
+        } catch (err) { alert('Gagal menyimpan signature: ' + err.message); }
+    }
+
+    onUserSignatureSelect(input, previewId, dataId) {
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > 1024 * 1024) {
+            alert('File terlalu besar. Maksimal 1MB.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            document.getElementById(previewId).innerHTML = `<img src="${dataUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
+            document.getElementById(dataId).value = dataUrl;
+        };
+        reader.readAsDataURL(file);
     }
 
     async deleteUser(id, username) {
