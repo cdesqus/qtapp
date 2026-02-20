@@ -259,7 +259,8 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     y += 10;
 
     // ── TERMS & CONDITIONS (after totals, before signature) ──
-    const terms = tx.terms || '';
+    const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled';
+    const terms = (tx.terms && typeof tx.terms === 'string' && tx.terms.trim().length > 0) ? tx.terms : defaultTerms;
     if (terms.trim()) {
         doc.setDrawColor(...PDF_COLORS.BORDER);
         doc.setLineWidth(0.3);
