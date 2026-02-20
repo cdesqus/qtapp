@@ -23,7 +23,7 @@ const Status = {
 };
 
 const API_URL = (window.location.hostname === 'erp.kaumtech.com') ? '' :
-    (window.location.protocol === 'file:') ? 'http://localhost:3000' : '';
+    (window.location.protocol === 'file:') ? 'http://localhost:3020' : '';
 
 class Store {
     constructor() {

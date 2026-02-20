@@ -13,7 +13,7 @@ RUN npm install
 COPY . .
 
 # Exposure
-EXPOSE 3000
+EXPOSE 3020
 
 # Start command
 CMD ["node", "server/server.js"]

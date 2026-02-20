@@ -388,5 +388,5 @@ app.post('/api/settings', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3020;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
