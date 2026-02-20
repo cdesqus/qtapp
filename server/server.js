@@ -264,6 +264,25 @@ app.post('/api/products', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.put('/api/products/:id', authenticate, async (req, res) => {
+    const { id } = req.params;
+    const { name, description, category, unit, price } = req.body;
+    try {
+        await pool.query(
+            'UPDATE products SET name=$1, description=$2, category=$3, unit=$4, price=$5 WHERE id=$6',
+            [name, description, category, unit, price, id]
+        );
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.delete('/api/products/:id', authenticate, async (req, res) => {
+    try {
+        await pool.query('DELETE FROM products WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 // --- Transactions ---
 app.get('/api/transactions', authenticate, async (req, res) => {
     const { type } = req.query;

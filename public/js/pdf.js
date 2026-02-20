@@ -6,10 +6,11 @@ const PDF_COLORS = {
     BORDER: [226, 232, 240]
 };
 
-const printPDF = (id) => {
+const printPDF = async (id) => {
     const { jsPDF } = window.jspdf;
     const store = window.store;
-    const tx = store.getTransaction(id);
+    const tx = await store.getTransaction(id);
+    if (!tx) return;
     const doc = new jsPDF();
     const settings = store.companySettings;
     const client = store.clients.find(c => c.id === tx.clientId);

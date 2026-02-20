@@ -171,9 +171,41 @@ class Store {
         await this.loadClients();
     }
 
-    async deleteClient(id) {
-        await this.apiFetch(`${API_URL}/api/clients/${id}`, { method: 'DELETE' });
-        await this.loadClients();
+    async addProduct(product) {
+        await this.apiFetch(`${API_URL}/api/products`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(product)
+        });
+        await this.loadProducts();
+    }
+
+    async updateProduct(id, data) {
+        await this.apiFetch(`${API_URL}/api/products/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        await this.loadProducts();
+    }
+
+    async deleteProduct(id) {
+        await this.apiFetch(`${API_URL}/api/products/${id}`, { method: 'DELETE' });
+        await this.loadProducts();
+    }
+
+    async addUnit(name) {
+        await this.apiFetch(`${API_URL}/api/units`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name })
+        });
+        await this.loadUnits();
+    }
+
+    async deleteUnit(name) {
+        await this.apiFetch(`${API_URL}/api/units/${name}`, { method: 'DELETE' });
+        await this.loadUnits();
     }
 
     async updateUser(id, newData) {
