@@ -435,8 +435,9 @@ class UI {
                     </div>
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 120px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Category</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
@@ -467,12 +468,12 @@ class UI {
                 document.querySelectorAll('.tx-item-row').forEach(row => {
                     const idx = row.dataset.index;
                     items.push({
-                        itemId: row.querySelector(`select[name="items[${idx}][itemId]"]`).value,
+                        itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
                         qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
                         price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
                         margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
                         remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                        category: 'Barang',
+                        category: row.querySelector(`input[name="items[${idx}][category]"]`).value || 'Barang',
                         unit: 'Pcs'
                     });
                 });
@@ -500,20 +501,43 @@ class UI {
         const container = document.getElementById('tx-items-container');
         if (!container) return;
         const idx = this.currentItemIndex++;
+
+        // Resolve product name and category for existing items
+        let productName = '';
+        let productCategory = '';
+        let productId = '';
+        if (item) {
+            const pid = item.itemId || item.item_id;
+            productId = pid || '';
+            const found = window.store.products.find(p => p.id === pid);
+            if (found) {
+                productName = found.name;
+                productCategory = found.category || item.category || '';
+            } else {
+                productCategory = item.category || '';
+            }
+        }
+
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '3fr 80px 140px 90px 2fr 40px';
+        row.style.gridTemplateColumns = '3fr 120px 80px 140px 90px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
         row.dataset.index = idx;
 
         row.innerHTML = `
-            <select name="items[${idx}][itemId]" required onchange="window.ui.onItemSelect(this, ${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
-                <option value="">Select Product</option>
-                ${window.store.products.map(p => `<option value="${p.id}" ${item && (item.itemId === p.id || item.item_id === p.id) ? 'selected' : ''} data-price="${p.price}">${p.name}</option>`).join('')}
-            </select>
+            <div style="position: relative;">
+                <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
+                    oninput="window.ui.onProductSearch(this, ${idx})"
+                    onfocus="window.ui.onProductSearch(this, ${idx})"
+                    style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
+                <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
+                <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+            </div>
+            <input type="text" name="items[${idx}][category]" value="${productCategory}" readonly
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f8fafc; color: var(--text-secondary); text-align: center;">
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : 15}" placeholder="15" min="0" max="100" step="0.5" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
@@ -521,18 +545,63 @@ class UI {
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById(`product-dropdown-${idx}`);
+            if (dropdown && !row.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    onProductSearch(input, idx) {
+        const query = input.value.toLowerCase().trim();
+        const dropdown = document.getElementById(`product-dropdown-${idx}`);
+        if (!dropdown) return;
+
+        const products = window.store.products || [];
+        const filtered = query.length === 0 ? products : products.filter(p =>
+            p.name.toLowerCase().includes(query) || (p.category || '').toLowerCase().includes(query)
+        );
+
+        if (filtered.length === 0) {
+            dropdown.innerHTML = '<div style="padding: 10px 12px; color: var(--text-secondary); font-size: 0.85rem;">No products found</div>';
+            dropdown.style.display = 'block';
+            return;
+        }
+
+        dropdown.innerHTML = filtered.map(p => `
+            <div class="product-search-option" onclick="window.ui.selectProduct(${idx}, '${p.id}')"
+                style="padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
+                onmouseover="this.style.background='var(--bg-color)'" onmouseout="this.style.background='transparent'">
+                <span style="font-size: 0.9rem;">${p.name}</span>
+                <span style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: ${p.category === 'Service' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)'}; color: ${p.category === 'Service' ? '#8b5cf6' : '#0ea5e9'};">${p.category || '-'}</span>
+            </div>
+        `).join('');
+        dropdown.style.display = 'block';
+    }
+
+    selectProduct(idx, productId) {
+        const product = window.store.products.find(p => p.id === productId);
+        if (!product) return;
+
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        if (!row) return;
+
+        // Set values
+        row.querySelector(`input[name="items[${idx}][search]"]`).value = product.name;
+        row.querySelector(`input[name="items[${idx}][itemId]"]`).value = product.id;
+        row.querySelector(`input[name="items[${idx}][category]"]`).value = product.category || '';
+        row.querySelector(`input[name="items[${idx}][price]"]`).value = product.price || 0;
+
+        // Close dropdown
+        const dropdown = document.getElementById(`product-dropdown-${idx}`);
+        if (dropdown) dropdown.style.display = 'none';
     }
 
     onItemSelect(select, idx) {
-        if (select.selectedIndex <= 0) return;
-        const price = select.options[select.selectedIndex].dataset.price;
-        if (price) {
-            const row = select.closest('.tx-item-row');
-            if (row) {
-                const priceInput = row.querySelector(`input[name="items[${idx}][price]"]`);
-                if (priceInput) priceInput.value = price;
-            }
-        }
+        // Legacy - kept for compatibility
     }
 
     async deleteTransaction(id, type) {
