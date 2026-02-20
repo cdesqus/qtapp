@@ -321,7 +321,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
 app.get('/api/transactions/:id', authenticate, async (req, res) => {
     try {
         const tx = await pool.query('SELECT t.*, c.name as client_name FROM transactions t LEFT JOIN clients c ON t.client_id = c.id WHERE t.id = $1', [req.params.id]);
-        const items = await pool.query('SELECT * FROM transaction_items WHERE transaction_id = $1', [req.params.id]);
+        const items = await pool.query('SELECT ti.*, p.name as item_name, p.description as item_description FROM transaction_items ti LEFT JOIN products p ON ti.item_id = p.id WHERE ti.transaction_id = $1', [req.params.id]);
         sendJson(res, { ...tx.rows[0], items: items.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
