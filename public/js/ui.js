@@ -553,6 +553,10 @@ class UI {
                     <div id="tx-items-container"></div>
                     <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top: 10px;">+ Add Item</button>
 
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
+                    <div id="tx-terms-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTermRow()" style="margin-top: 10px;">+ Add Term</button>
+
                     <div style="margin-top: 20px;">
                         <button type="submit" class="btn btn-primary">Save ${type}</button>
                         <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
@@ -561,10 +565,32 @@ class UI {
             `;
             this.openModal(content);
             this.currentItemIndex = 0;
+            this.currentTermIndex = 0;
             if (tx.items && tx.items.length > 0) {
                 tx.items.forEach(item => this.addTxItemRow(item));
             } else {
                 this.addTxItemRow();
+            }
+
+            // Load terms
+            const defaultTerms = [
+                'Prices are quoted excluding VAT',
+                'PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled',
+                'The price valid until 14 days'
+            ];
+            if (tx.terms && typeof tx.terms === 'string' && tx.terms.trim().length > 0) {
+                try {
+                    const parsed = JSON.parse(tx.terms);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach(t => this.addTermRow(t));
+                    } else {
+                        defaultTerms.forEach(t => this.addTermRow(t));
+                    }
+                } catch {
+                    defaultTerms.forEach(t => this.addTermRow(t));
+                }
+            } else {
+                defaultTerms.forEach(t => this.addTermRow(t));
             }
 
             document.getElementById('transaction-form').onsubmit = async (e) => {
@@ -584,12 +610,20 @@ class UI {
                     });
                 });
 
+                // Collect terms
+                const terms = [];
+                document.querySelectorAll('#tx-terms-container .term-row input').forEach(input => {
+                    const val = input.value.trim();
+                    if (val) terms.push(val);
+                });
+
                 const data = {
                     type,
                     docNumber: formData.get('docNumber'),
                     date: formData.get('date'),
                     clientId: formData.get('clientId'),
                     status: tx.status || 'Draft',
+                    terms: JSON.stringify(terms),
                     items
                 };
 
@@ -601,6 +635,32 @@ class UI {
                 } catch (err) { alert("Gagal menyimpan transaksi: " + err.message); }
             };
         } catch (err) { alert("Gagal membuka form: " + err.message); }
+    }
+    addTermRow(text = '') {
+        const container = document.getElementById('tx-terms-container');
+        if (!container) return;
+        const idx = this.currentTermIndex++;
+        const row = document.createElement('div');
+        row.className = 'term-row';
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '10px';
+
+        const num = container.querySelectorAll('.term-row').length + 1;
+
+        row.innerHTML = `
+            <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); min-width: 24px;">${num}.</span>
+            <input type="text" value="${text}" placeholder="Enter term..." style="flex: 1; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
+            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove(); window.ui.renumberTerms()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
+        `;
+        container.appendChild(row);
+    }
+
+    renumberTerms() {
+        document.querySelectorAll('#tx-terms-container .term-row').forEach((row, i) => {
+            const numSpan = row.querySelector('span');
+            if (numSpan) numSpan.textContent = `${i + 1}.`;
+        });
     }
 
     addTxItemRow(item = null) {
