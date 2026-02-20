@@ -337,12 +337,12 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const { type, docNumber, customerPo, date, clientId, terms, status, items } = req.body;
 
-        // Check duplicate PO number
-        if (customerPo) {
-            const dup = await client.query('SELECT id FROM transactions WHERE customer_po = $1', [customerPo]);
+        // Check duplicate PO number — only for DO type
+        if (type === 'DO' && customerPo) {
+            const dup = await client.query("SELECT id FROM transactions WHERE customer_po = $1 AND type = 'DO'", [customerPo]);
             if (dup.rows.length > 0) {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ error: `Nomor PO "${customerPo}" sudah digunakan di transaksi lain.` });
+                return res.status(400).json({ error: `Sudah ada Delivery Order dengan PO Number "${customerPo}".` });
             }
         }
 
@@ -391,12 +391,14 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const { docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, signature } = req.body;
 
-        // Check duplicate PO number
-        if (customerPo) {
-            const dup = await client.query('SELECT id FROM transactions WHERE customer_po = $1 AND id != $2', [customerPo, id]);
+        // Check duplicate PO number — only for DO type
+        const existingTx = await client.query('SELECT type FROM transactions WHERE id = $1', [id]);
+        const txType = existingTx.rows[0]?.type;
+        if (txType === 'DO' && customerPo) {
+            const dup = await client.query("SELECT id FROM transactions WHERE customer_po = $1 AND type = 'DO' AND id != $2", [customerPo, id]);
             if (dup.rows.length > 0) {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ error: `Nomor PO "${customerPo}" sudah digunakan di transaksi lain.` });
+                return res.status(400).json({ error: `Sudah ada Delivery Order lain dengan PO Number "${customerPo}".` });
             }
         }
 

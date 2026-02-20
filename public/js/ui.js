@@ -163,24 +163,27 @@ class UI {
             const container = document.getElementById('content-area');
             const txs = (window.store.transactions || []).filter(t => t.type === type);
             const isQuo = type === 'QUO';
+            const isDO = type === 'DO';
+            const showPO = isQuo || isDO;
+            const colCount = showPO ? 6 : 5;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header">
                         <h3>${type} List</h3>
-                        <button class="btn btn-primary" onclick="window.ui.openTransactionForm('${type}')"><i class="fa-solid fa-plus"></i> New ${type}</button>
+                        ${isDO ? '' : `<button class="btn btn-primary" onclick="window.ui.openTransactionForm('${type}')"><i class="fa-solid fa-plus"></i> New ${type}</button>`}
                     </div>
                     <div class="table-container">
                         <table>
                             <thead>
-                                <tr><th>Date</th><th>Number</th>${isQuo ? '<th>PO Number</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Date</th><th>Number</th>${showPO ? '<th>PO Number</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
-                                ${txs.length === 0 ? `<tr><td colspan="${isQuo ? 6 : 5}" style="text-align:center">No ${type} found</td></tr>` :
+                                ${txs.length === 0 ? `<tr><td colspan="${colCount}" style="text-align:center">No ${type} found</td></tr>` :
                     txs.map(t => `
                                     <tr>
                                         <td>${window.formatDate(t.date)}</td>
                                         <td>${t.docNumber || '-'}</td>
-                                        ${isQuo ? `<td>${t.customerPo ? `<span style="padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;background:rgba(34,197,94,0.15);color:#16a34a;">${t.customerPo}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">-</span>'}</td>` : ''}
+                                        ${showPO ? `<td>${t.customerPo ? `<span style="padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;background:rgba(34,197,94,0.15);color:#16a34a;">${t.customerPo}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">-</span>'}</td>` : ''}
                                         <td>${t.clientName || '-'}</td>
                                         <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
                                         <td style="white-space: nowrap;">
