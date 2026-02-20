@@ -887,7 +887,15 @@ class UI {
         this.openModal(content);
         document.getElementById('confirm-po-form').onsubmit = async (e) => {
             e.preventDefault();
-            const poNumber = new FormData(e.target).get('poNumber');
+            const poNumber = new FormData(e.target).get('poNumber').trim();
+            if (!poNumber) return alert('PO Number tidak boleh kosong.');
+
+            // Check duplicate PO number client-side
+            const existing = (window.store.transactions || []).find(t => t.customerPo === poNumber && t.id !== txId);
+            if (existing) {
+                return alert(`PO Number "${poNumber}" sudah digunakan di ${existing.type} ${existing.docNumber}.`);
+            }
+
             try {
                 const fullTx = await window.store.getTransaction(txId);
                 await window.store.updateTransaction(txId, {
