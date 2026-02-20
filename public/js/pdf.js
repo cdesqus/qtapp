@@ -79,10 +79,11 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
-    let fullAddress = settings.address || '';
-    if (settings.phone) fullAddress += `  Phone: ${settings.phone}`;
-    const addressLines = doc.splitTextToSize(fullAddress, 105);
+    const addressLines = doc.splitTextToSize(settings.address || '', 80);
     doc.text(addressLines, infoX, y + 13);
+    if (settings.phone) {
+        doc.text(`Phone: ${settings.phone}`, infoX, y + 13 + addressLines.length * 3.5);
+    }
 
     // Title "QUOTATION" on the right
     doc.setFont('helvetica', 'bold');
@@ -220,29 +221,6 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
     y = doc.lastAutoTable.finalY + 6;
 
-    // ── TERMS & CONDITIONS (below table, before totals) ──
-    const terms = tx.terms || '';
-    if (terms.trim()) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(9);
-        doc.setTextColor(...PDF_COLORS.PRIMARY);
-        doc.text('TERMS & CONDITIONS', marginL, y);
-        y += 5;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(8);
-        doc.setTextColor(...PDF_COLORS.SECONDARY);
-
-        const termLines = terms.split('\n').filter(l => l.trim());
-        termLines.forEach(line => {
-            const wrapped = doc.splitTextToSize(line.trim(), contentW);
-            doc.text(wrapped, marginL, y);
-            y += wrapped.length * 3.5 + 1;
-        });
-
-        y += 6;
-    }
-
     // ── TOTALS ──────────────────────────
     let subtotal = 0;
     resolvedItems.forEach(item => {
@@ -278,25 +256,45 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     const grandTotal = subtotal + ppn;
     drawTotalRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
 
-    y += 8;
+    y += 10;
+
+    // ── TERMS & CONDITIONS (after totals, before signature) ──
+    const terms = tx.terms || '';
+    if (terms.trim()) {
+        doc.setDrawColor(...PDF_COLORS.BORDER);
+        doc.setLineWidth(0.3);
+        doc.line(marginL, y, pageW - marginR, y);
+        y += 6;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(...PDF_COLORS.PRIMARY);
+        doc.text('TERMS & CONDITIONS', marginL, y);
+        y += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...PDF_COLORS.SECONDARY);
+
+        const termLines = terms.split('\n').filter(l => l.trim());
+        termLines.forEach(line => {
+            const wrapped = doc.splitTextToSize(line.trim(), contentW);
+            doc.text(wrapped, marginL, y);
+            y += wrapped.length * 3.5 + 1;
+        });
+
+        y += 4;
+    }
 
     // ── Check page break ──
-    const neededSpace = 60;
-    if (y + neededSpace > doc.internal.pageSize.getHeight() - 15) {
+    const neededSpace = 55;
+    if (y + neededSpace > doc.internal.pageSize.getHeight() - 10) {
         doc.addPage();
         y = 20;
     }
 
-    // ── SIGNATURE AREA (Prepared by only, with logged-in user) ──
-    const sigY = Math.max(y + 5, doc.internal.pageSize.getHeight() - 55);
-
-    if (sigY + 40 > doc.internal.pageSize.getHeight() - 10) {
-        doc.addPage();
-        y = 30;
-    } else {
-        y = sigY;
-    }
-
+    // ── SIGNATURE AREA ──
+    y += 5;
     const sigLeftX = marginL + 15;
 
     doc.setFont('helvetica', 'normal');
@@ -309,16 +307,16 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     const loggedUser = (window.store.users || []).find(u => u.username === currentUser?.username);
     if (loggedUser?.signature) {
         try {
-            doc.addImage(loggedUser.signature, 'AUTO', sigLeftX - 2, y + 3, 40, 20);
+            doc.addImage(loggedUser.signature, 'AUTO', sigLeftX - 3, y + 2, 50, 25);
         } catch (e) { }
     }
 
-    y += 28;
+    y += 30;
 
     // Signature line
     doc.setDrawColor(...PDF_COLORS.BORDER);
     doc.setLineWidth(0.4);
-    doc.line(sigLeftX - 5, y, sigLeftX + 45, y);
+    doc.line(sigLeftX - 5, y, sigLeftX + 50, y);
 
     y += 4;
     doc.setFont('helvetica', 'bold');
@@ -331,7 +329,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...PDF_COLORS.SECONDARY);
     doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigLeftX, y);
 
-    // ── Save ──────────────────────────
+    // ── Save ──
     doc.save(`${tx.docNumber || 'Quotation'}.pdf`);
 }
 
