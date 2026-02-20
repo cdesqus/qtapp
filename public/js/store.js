@@ -156,6 +156,28 @@ class Store {
         this.currentUser = null;
     }
 
+    async addUser(data) {
+        const res = await this.apiFetch(`${API_URL}/api/users`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        if (res && !res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to add user');
+        }
+        await this.loadUsers();
+    }
+
+    async deleteUser(id) {
+        const res = await this.apiFetch(`${API_URL}/api/users/${id}`, { method: 'DELETE' });
+        if (res && !res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Failed to delete user');
+        }
+        await this.loadUsers();
+    }
+
     async saveSettings(settings) {
         await this.apiFetch(`${API_URL}/api/settings`, {
             method: 'POST',

@@ -240,17 +240,20 @@ class UI {
                 <div class="card">
                     <div class="card-header">
                         <h3>User Management</h3>
-                        <p>Total users: ${users.length}</p>
+                        <button class="btn btn-primary" onclick="window.ui.openUserForm()"><i class="fa-solid fa-plus"></i> Add User</button>
                     </div>
                     <div class="table-container">
                         <table>
                             <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
                             <tbody>
-                                ${users.map(u => `
+                                ${users.length === 0 ? '<tr><td colspan="3" style="text-align:center">No users found</td></tr>' :
+                    users.map(u => `
                                     <tr>
                                         <td>${u.username}</td>
-                                        <td>${u.role}</td>
-                                        <td><button class="btn btn-sm btn-secondary" onclick="alert('Edit user coming soon')">Edit</button></td>
+                                        <td><span style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; background: ${u.role === 'admin' ? 'rgba(14,165,233,0.15)' : 'rgba(100,116,139,0.15)'}; color: ${u.role === 'admin' ? '#0ea5e9' : '#64748b'};">${u.role}</span></td>
+                                        <td>
+                                            <button class="btn btn-sm btn-error" onclick="window.ui.deleteUser('${u.id}', '${u.username}')" ${u.username === (window.store.currentUser?.username) ? 'disabled title="Cannot delete yourself"' : ''}><i class="fa-solid fa-trash"></i></button>
+                                        </td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -263,10 +266,56 @@ class UI {
         }
     }
 
+    openUserForm() {
+        const content = `
+            <h3>Add New User</h3>
+            <form id="user-form">
+                <div class="form-group"><label>Username</label><input type="text" name="username" required placeholder="Enter username"></div>
+                <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="Enter password" minlength="4"></div>
+                <div class="form-group">
+                    <label>Role</label>
+                    <select name="role" required>
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button type="submit" class="btn btn-primary">Create User</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                </div>
+            </form>
+        `;
+        this.openModal(content);
+        document.getElementById('user-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                username: formData.get('username'),
+                password: formData.get('password'),
+                role: formData.get('role')
+            };
+            try {
+                await window.store.addUser(data);
+                this.closeModal();
+                this.renderUsers();
+            } catch (err) { alert("Gagal menambah user: " + err.message); }
+        };
+    }
+
+    async deleteUser(id, username) {
+        if (confirm(`Hapus user "${username}"?`)) {
+            try {
+                await window.store.deleteUser(id);
+                this.renderUsers();
+            } catch (err) { alert("Gagal menghapus user: " + err.message); }
+        }
+    }
+
     renderSettings() {
         try {
             const container = document.getElementById('content-area');
             const s = window.store.companySettings;
+            const logoSrc = s.logo ? (typeof s.logo === 'string' && s.logo.startsWith('data:') ? s.logo : s.logo) : '';
             container.innerHTML = `
                 <div class="card">
                     <h3>Company Settings</h3>
@@ -274,13 +323,70 @@ class UI {
                         <div class="form-group"><label>Company Name</label><input type="text" name="name" value="${s.name || ''}"></div>
                         <div class="form-group"><label>Address</label><textarea name="address">${s.address || ''}</textarea></div>
                         <div class="form-group"><label>Phone</label><input type="text" name="phone" value="${s.phone || ''}"></div>
+                        <div class="form-group">
+                            <label>Company Logo</label>
+                            <div style="display: flex; align-items: center; gap: 20px; margin-top: 8px;">
+                                <div id="logo-preview" style="width: 120px; height: 120px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #f8fafc;">
+                                    ${logoSrc ? `<img src="${logoSrc}" style="max-width: 100%; max-height: 100%; object-fit: contain;">` : '<span style="color: var(--text-secondary); font-size: 0.8rem;">No logo</span>'}
+                                </div>
+                                <div>
+                                    <input type="file" id="logo-file-input" accept="image/*" style="display:none;" onchange="window.ui.onLogoFileSelect(this)">
+                                    <button type="button" class="btn btn-secondary" onclick="document.getElementById('logo-file-input').click()" style="margin-bottom: 8px;">
+                                        <i class="fa-solid fa-upload"></i> Upload Logo
+                                    </button>
+                                    ${logoSrc ? '<br><button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeLogo()" style="margin-top: 4px;"><i class="fa-solid fa-trash"></i> Remove</button>' : ''}
+                                    <p style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 8px;">PNG, JPG, atau SVG. Max 2MB.</p>
+                                </div>
+                            </div>
+                            <input type="hidden" id="logo-data" name="logo" value="">
+                        </div>
                         <button type="submit" class="btn btn-primary">Save Settings</button>
                     </form>
                 </div>
             `;
+
+            // Wire up settings form submit
+            document.getElementById('settings-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const logoData = document.getElementById('logo-data').value;
+                const data = {
+                    name: formData.get('name'),
+                    address: formData.get('address'),
+                    phone: formData.get('phone')
+                };
+                if (logoData) data.logo = logoData;
+                else if (logoData === '__REMOVE__') data.logo = '';
+                try {
+                    await window.store.saveSettings(data);
+                    alert('Settings saved!');
+                    this.renderSettings();
+                } catch (err) { alert('Gagal menyimpan settings: ' + err.message); }
+            };
         } catch (err) {
             this.showErrorMessage("Gagal memuat settings: " + err.message);
         }
+    }
+
+    onLogoFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        if (file.size > 2 * 1024 * 1024) {
+            alert('File terlalu besar. Maksimal 2MB.');
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target.result;
+            document.getElementById('logo-preview').innerHTML = `<img src="${dataUrl}" style="max-width: 100%; max-height: 100%; object-fit: contain;">`;
+            document.getElementById('logo-data').value = dataUrl;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    removeLogo() {
+        document.getElementById('logo-preview').innerHTML = '<span style="color: var(--text-secondary); font-size: 0.8rem;">No logo</span>';
+        document.getElementById('logo-data').value = '__REMOVE__';
     }
 
     async saveUnit() {
@@ -473,7 +579,7 @@ class UI {
                         price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
                         margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
                         remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                        category: row.querySelector(`.cat-btn-group[data-idx="${idx}"] .cat-btn.active`)?.dataset.cat || 'Barang',
+                        category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
                         unit: 'Pcs'
                     });
                 });
@@ -530,18 +636,10 @@ class UI {
         const activeCat = productCategory || 'Barang';
 
         row.innerHTML = `
-            <div class="cat-btn-group" data-idx="${idx}" style="display: flex; border-radius: 6px; overflow: hidden; border: 1px solid var(--border-color); height: 36px;">
-                <button type="button" class="cat-btn ${activeCat === 'Barang' ? 'active' : ''}" data-cat="Barang" onclick="window.ui.toggleCategory(${idx}, 'Barang')"
-                    style="flex:1; border:none; padding: 0 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
-                    ${activeCat === 'Barang' ? 'background: var(--primary); color: white;' : 'background: #f8fafc; color: var(--text-secondary);'}">
-                    Barang
-                </button>
-                <button type="button" class="cat-btn ${activeCat === 'Service' ? 'active' : ''}" data-cat="Service" onclick="window.ui.toggleCategory(${idx}, 'Service')"
-                    style="flex:1; border:none; border-left: 1px solid var(--border-color); padding: 0 6px; font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
-                    ${activeCat === 'Service' ? 'background: #8b5cf6; color: white;' : 'background: #f8fafc; color: var(--text-secondary);'}">
-                    Service
-                </button>
-            </div>
+            <select name="items[${idx}][category]" onchange="window.ui.onCategoryChange(${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
+                <option value="Barang" ${activeCat === 'Barang' ? 'selected' : ''}>Barang</option>
+                <option value="Service" ${activeCat === 'Service' ? 'selected' : ''}>Service</option>
+            </select>
             <div style="position: relative;">
                 <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
                     oninput="window.ui.onProductSearch(this, ${idx})"
@@ -572,10 +670,10 @@ class UI {
         const dropdown = document.getElementById(`product-dropdown-${idx}`);
         if (!dropdown) return;
 
-        // Get selected category from toggle buttons
+        // Get selected category from dropdown
         const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
-        const activeCatBtn = row?.querySelector(`.cat-btn-group[data-idx="${idx}"] .cat-btn.active`);
-        const selectedCat = activeCatBtn?.dataset.cat || '';
+        const catSelect = row?.querySelector(`select[name="items[${idx}][category]"]`);
+        const selectedCat = catSelect?.value || '';
 
         const products = window.store.products || [];
         let filtered = products;
@@ -607,24 +705,9 @@ class UI {
         dropdown.style.display = 'block';
     }
 
-    toggleCategory(idx, cat) {
+    onCategoryChange(idx) {
         const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
         if (!row) return;
-        const group = row.querySelector(`.cat-btn-group[data-idx="${idx}"]`);
-        if (!group) return;
-
-        group.querySelectorAll('.cat-btn').forEach(btn => {
-            const isCurrent = btn.dataset.cat === cat;
-            btn.classList.toggle('active', isCurrent);
-            if (btn.dataset.cat === 'Barang') {
-                btn.style.background = isCurrent ? 'var(--primary)' : '#f8fafc';
-                btn.style.color = isCurrent ? 'white' : 'var(--text-secondary)';
-            } else {
-                btn.style.background = isCurrent ? '#8b5cf6' : '#f8fafc';
-                btn.style.color = isCurrent ? 'white' : 'var(--text-secondary)';
-            }
-        });
-
         // Clear selected product when category changes
         row.querySelector(`input[name="items[${idx}][search]"]`).value = '';
         row.querySelector(`input[name="items[${idx}][itemId]"]`).value = '';
@@ -643,13 +726,10 @@ class UI {
         row.querySelector(`input[name="items[${idx}][itemId]"]`).value = product.id;
         row.querySelector(`input[name="items[${idx}][price]"]`).value = product.price || 0;
 
-        // Auto-activate matching category button
-        if (product.category) {
-            this.toggleCategory(idx, product.category);
-            // Re-set product name since toggleCategory clears it
-            row.querySelector(`input[name="items[${idx}][search]"]`).value = product.name;
-            row.querySelector(`input[name="items[${idx}][itemId]"]`).value = product.id;
-            row.querySelector(`input[name="items[${idx}][price]"]`).value = product.price || 0;
+        // Auto-set category dropdown
+        const catSelect = row.querySelector(`select[name="items[${idx}][category]"]`);
+        if (catSelect && product.category) {
+            catSelect.value = product.category;
         }
 
         // Close dropdown
