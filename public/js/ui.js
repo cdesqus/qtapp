@@ -415,7 +415,6 @@ class UI {
                 clientId: '',
                 docNumber: window.store.generateNextDocNumber(type),
                 terms: '',
-                margin: 15,
                 status: 'Draft',
                 items: []
             };
@@ -434,17 +433,13 @@ class UI {
                             </select>
                         </div>
                     </div>
-                    
-                    <div class="form-group" style="margin-top: 15px; max-width: 200px;">
-                        <label>Margin (%)</label>
-                        <input type="number" name="margin" value="${tx.margin != null ? tx.margin : 15}" min="0" max="100" step="0.5" required>
-                    </div>
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 100px 150px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Remarks</span>
                         <span></span>
                     </div>
@@ -475,6 +470,7 @@ class UI {
                         itemId: row.querySelector(`select[name="items[${idx}][itemId]"]`).value,
                         qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
                         price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
+                        margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
                         remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
                         category: 'Barang',
                         unit: 'Pcs'
@@ -486,7 +482,6 @@ class UI {
                     docNumber: formData.get('docNumber'),
                     date: formData.get('date'),
                     clientId: formData.get('clientId'),
-                    margin: Number(formData.get('margin')) || 15,
                     status: tx.status || 'Draft',
                     items
                 };
@@ -508,7 +503,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '3fr 100px 150px 2fr 40px';
+        row.style.gridTemplateColumns = '3fr 80px 140px 90px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -521,6 +516,7 @@ class UI {
             </select>
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
+            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : 15}" placeholder="15" min="0" max="100" step="0.5" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
