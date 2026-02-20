@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ERP System - Quotation, DO, BAP, Invoice</title>
+    <link rel="stylesheet" href="css/styles.css">
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Sign Pad for BAP -->
+    <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.0.0/dist/signature_pad.umd.min.js"></script>
+    <!-- JSPDF for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <!-- Flatpickr for Calendar -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/dark.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+</head>
+
+<body>
+    <div id="app">
+        <aside class="sidebar">
+            <div class="logo">
+                <i class="fa-solid fa-cube"></i> IDE ERP
+            </div>
+            <nav>
+                <button data-view="dashboard" class="active"><i class="fa-solid fa-chart-line"></i> Dashboard</button>
+                <button data-view="clients"><i class="fa-solid fa-users"></i> Clients</button>
+                <button data-view="products"><i class="fa-solid fa-box"></i> Products & Services</button>
+                <button data-view="measurements"><i class="fa-solid fa-ruler"></i> Measurements</button>
+                <div class="separator"></div>
+                <button data-view="quotations"><i class="fa-solid fa-file-invoice"></i> Quotations</button>
+                <div class="separator"></div>
+                <button data-view="todo-do" style="border-left: 4px solid var(--primary); display:none;"><i
+                        class="fa-solid fa-clipboard-list"></i> To-Do DO</button>
+                <button data-view="todo-bap" style="border-left: 4px solid var(--secondary); display:none;"><i
+                        class="fa-solid fa-clipboard-check"></i> To-Do BAP</button>
+                <div class="separator"></div>
+                <button data-view="delivery-orders"><i class="fa-solid fa-truck"></i> Delivery Orders</button>
+                <button data-view="bap"><i class="fa-solid fa-file-signature"></i> BAP</button>
+                <button data-view="invoices"><i class="fa-solid fa-file-invoice-dollar"></i> Invoices</button>
+                <div class="separator"></div>
+                <button data-view="settings" id="nav-settings" style="display:none;"><i class="fa-solid fa-gear"></i>
+                    Settings</button>
+                <button data-view="users" id="nav-users" style="display:none;"><i class="fa-solid fa-user-shield"></i>
+                    Users</button>
+                <div class="separator"></div>
+                <button id="logout-btn" style="color: var(--error);"><i class="fa-solid fa-right-from-bracket"></i>
+                    Logout</button>
+            </nav>
+        </aside>
+        <main class="main-content">
+            <header>
+                <h1 id="page-title">Dashboard</h1>
+                <div class="user-profile">
+                    <span id="user-display-name">Admin</span>
+                    <div class="avatar" id="user-avatar">A</div>
+                </div>
+            </header>
+            <div id="content-area">
+                <!-- Dynamic Content Loaded Here -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="modal-overlay hidden">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <div id="modal-body"></div>
+        </div>
+    </div>
+
+    <!-- Secondary Modal for Selection -->
+    <div id="select-modal-container" class="modal-overlay hidden" style="z-index: 1100;">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close-modal"
+                onclick="document.getElementById('select-modal-container').classList.add('hidden')">&times;</span>
+            <div id="select-modal-body"></div>
+        </div>
+    </div>
+
+    <script src="js/store.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/pdf.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
