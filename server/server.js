@@ -337,6 +337,16 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const { type, docNumber, customerPo, date, clientId, terms, status, items } = req.body;
 
+        // Check duplicate PO number
+        if (customerPo) {
+            const dup = await client.query('SELECT id FROM transactions WHERE customer_po = $1', [customerPo]);
+            if (dup.rows.length > 0) {
+                await client.query('ROLLBACK');
+                client.release();
+                return res.status(400).json({ error: `Nomor PO "${customerPo}" sudah digunakan di transaksi lain.` });
+            }
+        }
+
         const txResult = await client.query(
             'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
             [type, docNumber, customerPo, date, clientId, terms, status]

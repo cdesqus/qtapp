@@ -897,40 +897,131 @@ class UI {
             const source = await window.store.getTransaction(sourceId);
             if (!source) return alert('Source transaction not found');
 
-            const newDocNumber = window.store.generateNextDocNumber(targetType);
-            const items = (source.items || []).map(item => ({
-                itemId: item.itemId || item.item_id,
-                category: item.category,
-                qty: item.qty,
-                unit: item.unit,
-                sn: item.sn,
-                remarks: item.remarks,
-                cost: item.cost,
-                margin: item.margin,
-                price: item.price
-            }));
+            // Filter items: for DO, only category 'Barang'
+            let sourceItems = (source.items || []);
+            if (targetType === 'DO') {
+                sourceItems = sourceItems.filter(item => (item.category || '').toLowerCase() === 'barang');
+                if (sourceItems.length === 0) {
+                    return alert('Tidak ada item kategori Barang untuk dibuat DO.');
+                }
+            }
 
-            const data = {
+            // Build a virtual transaction as a draft to open in form
+            const newDocNumber = window.store.generateNextDocNumber(targetType);
+            const draftTx = {
                 type: targetType,
                 docNumber: newDocNumber,
-                customerPo: source.customerPo,
+                customerPo: source.customerPo || '',
                 date: new Date().toISOString().split('T')[0],
                 clientId: source.clientId,
-                terms: source.terms,
-                status: 'Draft'
+                terms: source.terms || '',
+                status: 'Draft',
+                items: sourceItems.map(item => ({
+                    itemId: item.itemId || item.item_id,
+                    category: item.category,
+                    qty: item.qty,
+                    unit: item.unit,
+                    sn: item.sn,
+                    remarks: item.remarks,
+                    cost: item.cost,
+                    margin: item.margin,
+                    price: item.price
+                }))
             };
 
-            await window.store.addTransaction(data, items);
-
-            const typeName = { DO: 'Delivery Order', BAP: 'BAST', INV: 'Invoice' };
-            alert(`${typeName[targetType] || targetType} created: ${newDocNumber}`);
-
-            // Navigate to the target type list
-            const menuMap = { DO: 'delivery-orders', BAP: 'bap', INV: 'invoices' };
-            if (menuMap[targetType]) {
-                document.querySelector(`[data-page="${menuMap[targetType]}"]`)?.click();
-            }
+            // Open the transaction form pre-filled with draft data (not yet saved)
+            this._openConvertForm(targetType, draftTx);
         } catch (err) { alert('Gagal convert: ' + err.message); }
+    }
+
+    async _openConvertForm(type, tx) {
+        try {
+            const content = `
+                <h3>New ${type} (from Quotation)</h3>
+                <form id="transaction-form">
+                    <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                        <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required readonly style="background:#f1f5f9; cursor:not-allowed;"></div>
+                        <div class="form-group"><label>Date</label><input type="date" name="date" value="${tx.date}" required></div>
+                        <div class="form-group">
+                            <label>Client</label>
+                            <select name="clientId" required>
+                                <option value="">Select Client</option>
+                                ${window.store.clients.map(c => `<option value="${c.id}" ${tx.clientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+
+                    <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Category</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Remarks</span>
+                        <span></span>
+                    </div>
+                    <div id="tx-items-container"></div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top: 10px;">+ Add Item</button>
+
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
+                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions...">${tx.terms || ''}</textarea>
+
+                    <div style="margin-top: 20px;">
+                        <button type="submit" class="btn btn-primary">Save ${type}</button>
+                        <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                    </div>
+                </form>
+            `;
+            this.openModal(content);
+
+            this.currentItemIndex = 0;
+            if (tx.items && tx.items.length > 0) {
+                tx.items.forEach(item => this.addTxItemRow(item));
+            } else {
+                this.addTxItemRow();
+            }
+
+            document.getElementById('transaction-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const formData = new FormData(e.target);
+                const items = [];
+                document.querySelectorAll('.tx-item-row').forEach(row => {
+                    const idx = row.dataset.index;
+                    items.push({
+                        itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                        qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                        price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
+                        margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
+                        remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
+                        category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                        unit: 'Pcs'
+                    });
+                });
+
+                const termsText = document.getElementById('tx-terms').value.trim();
+
+                const data = {
+                    type,
+                    docNumber: formData.get('docNumber'),
+                    customerPo: tx.customerPo,
+                    date: formData.get('date'),
+                    clientId: formData.get('clientId'),
+                    status: 'Draft',
+                    terms: termsText,
+                    items
+                };
+
+                try {
+                    await window.store.addTransaction(data, items);
+                    this.closeModal();
+                    const menuMap = { DO: 'delivery-orders', BAP: 'bap', INV: 'invoices' };
+                    if (menuMap[type]) {
+                        document.querySelector(`[data-page="${menuMap[type]}"]`)?.click();
+                    }
+                } catch (err) { alert("Gagal menyimpan: " + err.message); }
+            };
+        } catch (err) { alert("Gagal membuka form: " + err.message); }
     }
 }
 

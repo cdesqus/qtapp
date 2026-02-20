@@ -375,7 +375,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setFontSize(7.5);
     doc.setTextColor(...DO_COLORS.SECONDARY);
 
-    let companyLine = settings.address || '';
+    let companyLine = (settings.address || '').replace(/Tebet,\s*/i, 'Tebet,\n');
     if (settings.phone) companyLine += `  \u2022  Phone: ${settings.phone}`;
     if (settings.email) companyLine += `  \u2022  ${settings.email}`;
     const companyLines = doc.splitTextToSize(companyLine, 100);
@@ -387,11 +387,6 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...DO_COLORS.PRIMARY);
     doc.text('DELIVERY ORDER', pageW - marginR, y + 8, { align: 'right' });
 
-    // Subtle tagline under title
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...DO_COLORS.SECONDARY);
-    doc.text('Surat Jalan', pageW - marginR, y + 14, { align: 'right' });
 
     y += Math.max(logoH, 22) + 8;
 
@@ -569,13 +564,12 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
         y = 25;
     }
 
-    // ── SIGNATURE AREA – Multi-party ──
+    // ── SIGNATURE AREA – Pengirim & Penerima (no signature images, no stamps) ──
     doc.setDrawColor(...DO_COLORS.BORDER);
     doc.setLineWidth(0.3);
     doc.line(marginL, y, pageW - marginR, y);
     y += 8;
 
-    // Two columns: Pengirim (left) | Penerima (right)
     const sigColW = (contentW - 20) / 2;
     const sigLeftX = marginL + sigColW / 2 - 5;
     const sigRightX = pageW - marginR - sigColW / 2 + 5;
@@ -586,16 +580,6 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...DO_COLORS.PRIMARY);
     doc.text('PENGIRIM / SENDER', sigLeftX, y, { align: 'center' });
     doc.text('PENERIMA / RECEIVER', sigRightX, y, { align: 'center' });
-    y += 4;
-
-    // Sender signature
-    const currentUser = window.store.currentUser;
-    const loggedUser = (window.store.users || []).find(u => u.username === currentUser?.username);
-    if (loggedUser?.signature) {
-        try {
-            doc.addImage(loggedUser.signature, 'AUTO', sigLeftX - 25, y + 1, 50, 25);
-        } catch (e) { }
-    }
 
     y += 30;
 
@@ -607,10 +591,11 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
 
     y += 4;
 
-    // Names under signature lines
+    // Names under lines
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...DO_COLORS.DARK);
+    const currentUser = window.store.currentUser;
     doc.text(currentUser?.username || 'Authorized', sigLeftX, y, { align: 'center' });
     doc.text('(                                    )', sigRightX, y, { align: 'center' });
 
@@ -620,24 +605,6 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...DO_COLORS.SECONDARY);
     doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigLeftX, y, { align: 'center' });
     doc.text(client?.name || 'Customer', sigRightX, y, { align: 'center' });
-
-    // Stamp boxes
-    y += 4;
-    doc.setDrawColor(...DO_COLORS.BORDER);
-    doc.setLineWidth(0.2);
-
-    // Left stamp box
-    const stampW = 30;
-    const stampH = 12;
-    doc.roundedRect(sigLeftX - stampW / 2, y, stampW, stampH, 1, 1);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6);
-    doc.setTextColor(...DO_COLORS.BORDER);
-    doc.text('Stempel / Stamp', sigLeftX, y + stampH / 2 + 1.5, { align: 'center' });
-
-    // Right stamp box
-    doc.roundedRect(sigRightX - stampW / 2, y, stampW, stampH, 1, 1);
-    doc.text('Stempel / Stamp', sigRightX, y + stampH / 2 + 1.5, { align: 'center' });
 
     // ── Footer line ──
     const footerY = pageH - 10;
