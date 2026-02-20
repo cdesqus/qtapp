@@ -79,7 +79,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
-    let addrText = settings.address || '';
+    let addrText = (settings.address || '').replace(/Tebet,\s*/i, 'Tebet,\n');
     if (settings.phone) addrText += `  Phone: ${settings.phone}`;
     const addressLines = doc.splitTextToSize(addrText, 105);
     doc.text(addressLines, infoX, y + 13);
