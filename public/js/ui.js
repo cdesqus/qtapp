@@ -897,10 +897,20 @@ class UI {
             const source = await window.store.getTransaction(sourceId);
             if (!source) return alert('Source transaction not found');
 
-            // Filter items: for DO, only category 'Barang'
+            // Filter items: for DO, only category 'Barang' — remove all Service items
             let sourceItems = (source.items || []);
             if (targetType === 'DO') {
-                sourceItems = sourceItems.filter(item => (item.category || '').toLowerCase() === 'barang');
+                sourceItems = sourceItems.filter(item => {
+                    // Check item's own category
+                    const itemCat = (item.category || '').toLowerCase();
+                    // Also check the product's category from the store
+                    const pid = item.itemId || item.item_id;
+                    const prod = pid ? (window.store.products || []).find(p => p.id === pid) : null;
+                    const prodCat = prod ? (prod.category || '').toLowerCase() : '';
+                    // Include only if category is Barang (exclude Service and unknown)
+                    if (itemCat === 'service' || prodCat === 'service') return false;
+                    return itemCat === 'barang' || prodCat === 'barang';
+                });
                 if (sourceItems.length === 0) {
                     return alert('Tidak ada item kategori Barang untuk dibuat DO.');
                 }
