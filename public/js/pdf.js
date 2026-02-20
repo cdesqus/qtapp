@@ -661,18 +661,7 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
         } catch (e) { /* logo unavailable */ }
     }
 
-    // ─────────────────────────────────────────────────
-    //  HUD corner accents (decorative)
-    // ─────────────────────────────────────────────────
-    const hudLen = 12;
-    doc.setDrawColor(...C.PRIMARY);
-    doc.setLineWidth(0.5);
-    // Top-left
-    doc.line(mL, y - 4, mL + hudLen, y - 4);
-    doc.line(mL, y - 4, mL, y - 4 + hudLen);
-    // Top-right
-    doc.line(pageW - mR - hudLen, y - 4, pageW - mR, y - 4);
-    doc.line(pageW - mR, y - 4, pageW - mR, y - 4 + hudLen);
+
 
     // ─────────────────────────────────────────────────
     //  HEADER – Centered logo + company + title
@@ -696,7 +685,7 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     doc.setFontSize(7.5);
     doc.setTextColor(...C.SECONDARY);
     let addrText = (settings.address || '').replace(/\n/g, '  ·  ');
-    if (settings.phone) addrText += `  ·  ${settings.phone}`;
+    if (settings.phone) addrText += `  ·  Phone : ${settings.phone}`;
     doc.text(addrText, pageW / 2, y, { align: 'center' });
     y += 10;
 
@@ -792,13 +781,11 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
         return { ...item, resolvedName: name };
     });
 
-    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'S/N', 'REMARKS', 'STATUS']];
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'STATUS']];
     const tableBody = resolvedItems.map((item, i) => [
         String(i + 1),
         item.resolvedName || '-',
         String(item.qty || 0),
-        item.sn || '-',
-        item.remarks || '-',
         'Completed'
     ]);
 
@@ -829,36 +816,19 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
         columnStyles: {
             0: { cellWidth: 12, halign: 'center' },
             1: { cellWidth: 'auto' },
-            2: { cellWidth: 16, halign: 'center' },
-            3: { cellWidth: 32 },
-            4: { cellWidth: 34 },
-            5: { cellWidth: 24, halign: 'center', fontStyle: 'bold' }
+            2: { cellWidth: 20, halign: 'center' },
+            3: { cellWidth: 28, halign: 'center', fontStyle: 'bold' }
         },
         alternateRowStyles: {
             fillColor: C.LIGHT_BG
         },
         didParseCell: (data) => {
             // Style the STATUS column with badge colors
-            if (data.section === 'body' && data.column.index === 5) {
+            if (data.section === 'body' && data.column.index === 3) {
                 data.cell.styles.textColor = C.SUCCESS;
                 data.cell.styles.fillColor = C.SUCCESS_BG;
                 data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.fontSize = 7;
-            }
-        },
-        didDrawCell: (data) => {
-            // HUD-style corner ticks on header cells
-            if (data.section === 'head') {
-                const { x, y: cy, width: cw, height: ch } = data.cell;
-                doc.setDrawColor(...C.ACCENT2);
-                doc.setLineWidth(0.3);
-                const tk = 2;
-                // top-left tick
-                doc.line(x, cy, x + tk, cy);
-                doc.line(x, cy, x, cy + tk);
-                // top-right tick
-                doc.line(x + cw, cy, x + cw - tk, cy);
-                doc.line(x + cw, cy, x + cw, cy + tk);
             }
         }
     });
@@ -918,28 +888,11 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     doc.setLineWidth(0.3);
     doc.roundedRect(mL, y, sigBoxW, sigBoxH, 2, 2, 'S');
 
-    // HUD corner marks on left box
-    doc.setDrawColor(...C.PRIMARY);
-    doc.setLineWidth(0.6);
-    const bk = 5;
-    doc.line(mL, y, mL + bk, y);
-    doc.line(mL, y, mL, y + bk);
-    doc.line(mL + sigBoxW, y, mL + sigBoxW - bk, y);
-    doc.line(mL + sigBoxW, y, mL + sigBoxW, y + bk);
-
     // Right signature box
     const rBoxX = pageW - mR - sigBoxW;
     doc.setDrawColor(...C.BORDER);
     doc.setLineWidth(0.3);
     doc.roundedRect(rBoxX, y, sigBoxW, sigBoxH, 2, 2, 'S');
-
-    // HUD corner marks on right box
-    doc.setDrawColor(...C.PRIMARY);
-    doc.setLineWidth(0.6);
-    doc.line(rBoxX, y, rBoxX + bk, y);
-    doc.line(rBoxX, y, rBoxX, y + bk);
-    doc.line(rBoxX + sigBoxW, y, rBoxX + sigBoxW - bk, y);
-    doc.line(rBoxX + sigBoxW, y, rBoxX + sigBoxW, y + bk);
 
     // Headers
     let sy = y + 7;
@@ -983,23 +936,13 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     doc.text(client?.name || 'Customer', sigRX, sy, { align: 'center' });
 
     // ─────────────────────────────────────────────────
-    //  FOOTER – HUD accent line
+    //  FOOTER
     // ─────────────────────────────────────────────────
     const footY = pageH - 10;
 
-    // HUD footer corners
-    doc.setDrawColor(...C.PRIMARY);
-    doc.setLineWidth(0.5);
-    // Bottom-left
-    doc.line(mL, footY + 5, mL + hudLen, footY + 5);
-    doc.line(mL, footY + 5, mL, footY + 5 - hudLen);
-    // Bottom-right
-    doc.line(pageW - mR - hudLen, footY + 5, pageW - mR, footY + 5);
-    doc.line(pageW - mR, footY + 5, pageW - mR, footY + 5 - hudLen);
-
     doc.setDrawColor(...C.BORDER);
     doc.setLineWidth(0.3);
-    doc.line(mL + hudLen + 2, footY, pageW - mR - hudLen - 2, footY);
+    doc.line(mL, footY, pageW - mR, footY);
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(6.5);
