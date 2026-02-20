@@ -22,8 +22,7 @@ const Status = {
     REJECTED: 'Rejected'
 };
 
-const API_URL = (window.location.hostname === 'erp.kaumtech.com') ? '' :
-    (window.location.origin.includes('localhost') || window.location.origin.includes('127.0.0.1')) ? window.location.origin : '';
+const API_URL = (window.location.protocol === 'file:') ? 'http://localhost:3020' : '';
 
 class Store {
     constructor() {

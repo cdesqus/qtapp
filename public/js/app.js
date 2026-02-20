@@ -110,3 +110,14 @@
 window.onload = () => {
     window.app = new App();
 };
+
+// Global Error Handling
+window.onerror = function (msg, url, lineNo, columnNo, error) {
+    console.error("Window Error:", msg, error);
+    // Don't alert for common minor errors, but log them
+    return false;
+};
+
+window.addEventListener('unhandledrejection', function (event) {
+    console.error('Unhandled Rejection:', event.reason);
+});

@@ -32,7 +32,14 @@ const loginLimiter = rateLimit({
 
 // 3. Middlewares
 app.use(cors({
-    origin: process.env.NODE_ENV === 'production' ? 'https://erp.kaumtech.com' : true,
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (origin.includes('kaumtech.com') || origin.includes('localhost') || origin.includes('127.0.0.1')) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -94,8 +101,8 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 
             res.cookie('token', token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'strict',
+                secure: process.env.NODE_ENV === 'production' && !req.headers.host.includes('localhost'),
+                sameSite: 'lax', // Use 'lax' for better compatibility with redirects
                 maxAge: 8 * 60 * 60 * 1000 // 8 hours
             });
 

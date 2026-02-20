@@ -37,13 +37,13 @@ class UI {
                             </tr>
                         </thead>
                         <tbody>
-                            ${transactions.slice(0, 5).map(t => `
+                            ${(transactions || []).slice(0, 5).map(t => `
                                 <tr>
                                     <td>${window.formatDate(t.date)}</td>
-                                    <td>${t.docNumber}</td>
+                                    <td>${t.docNumber || '-'}</td>
                                     <td>${t.clientName || '-'}</td>
-                                    <td>${t.type}</td>
-                                    <td><span class="status-badge status-${t.status.toLowerCase()}">${t.status}</span></td>
+                                    <td>${t.type || '-'}</td>
+                                    <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
                                 </tr>
                             `).join('')}
                         </tbody>
@@ -143,12 +143,12 @@ class UI {
                             <tr><th>Date</th><th>Number</th><th>Client</th><th>Status</th><th>Actions</th></tr>
                         </thead>
                         <tbody>
-                            ${txs.map(t => `
+                            ${(txs || []).map(t => `
                                 <tr>
                                     <td>${window.formatDate(t.date)}</td>
-                                    <td>${t.docNumber}</td>
+                                    <td>${t.docNumber || '-'}</td>
                                     <td>${t.clientName || '-'}</td>
-                                    <td><span class="status-badge status-${t.status.toLowerCase()}">${t.status}</span></td>
+                                    <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
                                     <td>
                                         <button class="btn btn-sm btn-secondary" onclick="window.ui.openTransactionForm('${type}', '${t.id}')"><i class="fa-solid fa-edit"></i></button>
                                         <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${t.id}')"><i class="fa-solid fa-print"></i></button>
@@ -236,10 +236,14 @@ class UI {
                 npwp: formData.get('npwp') === 'on',
                 npwpNumber: formData.get('npwpNumber')
             };
-            if (id) await window.store.updateClient(id, data);
-            else await window.store.addClient(data);
-            this.closeModal();
-            this.renderClients();
+            try {
+                if (id) await window.store.updateClient(id, data);
+                else await window.store.addClient(data);
+                this.closeModal();
+                this.renderClients();
+            } catch (err) {
+                alert("Gagal menyimpan client: " + err.message);
+            }
         };
     }
 
@@ -281,10 +285,14 @@ class UI {
                 unit: formData.get('unit'),
                 price: Number(formData.get('price'))
             };
-            if (id) await window.store.updateProduct(id, data);
-            else await window.store.addProduct(data);
-            this.closeModal();
-            this.renderProducts();
+            try {
+                if (id) await window.store.updateProduct(id, data);
+                else await window.store.addProduct(data);
+                this.closeModal();
+                this.renderProducts();
+            } catch (err) {
+                alert("Gagal menyimpan produk: " + err.message);
+            }
         };
     }
 
@@ -347,8 +355,8 @@ class UI {
                     qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
                     price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
                     remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                    category: 'Barang', // Default or fetch from product
-                    unit: 'Pcs' // Default or fetch from product
+                    category: 'Barang',
+                    unit: 'Pcs'
                 });
             });
 
@@ -358,14 +366,18 @@ class UI {
                 date: formData.get('date'),
                 clientId: formData.get('clientId'),
                 customerPo: formData.get('customerPo'),
-                status: tx.status,
+                status: tx.status || 'Draft',
                 items
             };
 
-            if (id) await window.store.updateTransaction(id, data, items);
-            else await window.store.addTransaction(data, items);
-            this.closeModal();
-            this.renderTransactions(type);
+            try {
+                if (id) await window.store.updateTransaction(id, data, items);
+                else await window.store.addTransaction(data, items);
+                this.closeModal();
+                this.renderTransactions(type);
+            } catch (err) {
+                alert("Gagal menyimpan transaksi: " + err.message);
+            }
         };
     }
 
