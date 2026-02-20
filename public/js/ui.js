@@ -936,6 +936,32 @@ class UI {
 
     async _openConvertForm(type, tx) {
         try {
+            const isDO = type === 'DO';
+            const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
+
+            const itemsHeader = isDO
+                ? `<div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Product</span>
+                        <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Serial Number</span>
+                        <span style="${headerStyle}">Remarks</span>
+                        <span></span>
+                   </div>`
+                : `<div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Category</span>
+                        <span style="${headerStyle}">Product</span>
+                        <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Price</span>
+                        <span style="${headerStyle}">Margin %</span>
+                        <span style="${headerStyle}">Remarks</span>
+                        <span></span>
+                   </div>`;
+
+            const termsSection = isDO ? '' : `
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
+                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions...">${tx.terms || ''}</textarea>
+            `;
+
             const content = `
                 <h3>New ${type} (from Quotation)</h3>
                 <form id="transaction-form">
@@ -952,20 +978,11 @@ class UI {
                     </div>
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Category</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Remarks</span>
-                        <span></span>
-                    </div>
+                    ${itemsHeader}
                     <div id="tx-items-container"></div>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top: 10px;">+ Add Item</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addDoItemRow()" style="margin-top: 10px;">+ Add Item</button>
 
-                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
-                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions...">${tx.terms || ''}</textarea>
+                    ${termsSection}
 
                     <div style="margin-top: 20px;">
                         <button type="submit" class="btn btn-primary">Save ${type}</button>
@@ -977,29 +994,52 @@ class UI {
 
             this.currentItemIndex = 0;
             if (tx.items && tx.items.length > 0) {
-                tx.items.forEach(item => this.addTxItemRow(item));
+                if (isDO) {
+                    tx.items.forEach(item => this.addDoItemRow(item));
+                } else {
+                    tx.items.forEach(item => this.addTxItemRow(item));
+                }
             } else {
-                this.addTxItemRow();
+                if (isDO) this.addDoItemRow();
+                else this.addTxItemRow();
             }
 
             document.getElementById('transaction-form').onsubmit = async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const items = [];
-                document.querySelectorAll('.tx-item-row').forEach(row => {
-                    const idx = row.dataset.index;
-                    items.push({
-                        itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
-                        qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
-                        price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
-                        margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
-                        remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                        category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
-                        unit: 'Pcs'
-                    });
-                });
 
-                const termsText = document.getElementById('tx-terms').value.trim();
+                if (isDO) {
+                    document.querySelectorAll('.tx-item-row').forEach(row => {
+                        const idx = row.dataset.index;
+                        items.push({
+                            itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                            sn: row.querySelector(`input[name="items[${idx}][sn]"]`)?.value || '',
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
+                            category: 'Barang',
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
+                            unit: 'Pcs'
+                        });
+                    });
+                } else {
+                    document.querySelectorAll('.tx-item-row').forEach(row => {
+                        const idx = row.dataset.index;
+                        items.push({
+                            itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
+                            category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                            unit: 'Pcs'
+                        });
+                    });
+                }
+
+                const termsEl = document.getElementById('tx-terms');
+                const termsText = termsEl ? termsEl.value.trim() : '';
 
                 const data = {
                     type,
@@ -1022,6 +1062,57 @@ class UI {
                 } catch (err) { alert("Gagal menyimpan: " + err.message); }
             };
         } catch (err) { alert("Gagal membuka form: " + err.message); }
+    }
+
+    addDoItemRow(item = null) {
+        const container = document.getElementById('tx-items-container');
+        if (!container) return;
+        const idx = this.currentItemIndex++;
+
+        let productName = '';
+        let productId = '';
+        if (item) {
+            const pid = item.itemId || item.item_id;
+            productId = pid || '';
+            const found = window.store.products.find(p => p.id === pid);
+            if (found) productName = found.name;
+        }
+
+        const row = document.createElement('div');
+        row.className = 'tx-item-row';
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '3fr 80px 2fr 2fr 40px';
+        row.style.gap = '10px';
+        row.style.marginBottom = '8px';
+        row.style.alignItems = 'center';
+        row.dataset.index = idx;
+
+        const inputStyle = 'width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;';
+
+        row.innerHTML = `
+            <div style="position: relative;">
+                <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
+                    oninput="window.ui.onProductSearch(this, ${idx})"
+                    onfocus="window.ui.onProductSearch(this, ${idx})"
+                    style="${inputStyle}">
+                <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
+                <input type="hidden" name="items[${idx}][price]" value="${item ? item.price : 0}">
+                <input type="hidden" name="items[${idx}][margin]" value="${item ? item.margin || 0 : 0}">
+                <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+            </div>
+            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle} text-align: center;">
+            <input type="text" name="items[${idx}][sn]" value="${item ? item.sn || '' : ''}" placeholder="Serial Number" style="${inputStyle}">
+            <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
+            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
+        `;
+        container.appendChild(row);
+
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById(`product-dropdown-${idx}`);
+            if (dropdown && !row.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
     }
 }
 
