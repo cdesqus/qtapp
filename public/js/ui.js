@@ -414,8 +414,8 @@ class UI {
                 date: new Date().toISOString().split('T')[0],
                 clientId: '',
                 docNumber: window.store.generateNextDocNumber(type),
-                customerPo: '',
                 terms: '',
+                margin: 15,
                 status: 'Draft',
                 items: []
             };
@@ -423,7 +423,7 @@ class UI {
             const content = `
                 <h3>${id ? 'Edit' : 'New'} ${type}</h3>
                 <form id="transaction-form">
-                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                         <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required></div>
                         <div class="form-group"><label>Date</label><input type="date" name="date" value="${tx.date.split('T')[0]}" required></div>
                         <div class="form-group">
@@ -433,10 +433,21 @@ class UI {
                                 ${window.store.clients.map(c => `<option value="${c.id}" ${tx.clientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
                             </select>
                         </div>
-                        <div class="form-group"><label>Customer PO</label><input type="text" name="customerPo" value="${tx.customerPo || ''}"></div>
                     </div>
                     
-                    <h4 style="margin-top: 20px;">Items</h4>
+                    <div class="form-group" style="margin-top: 15px; max-width: 200px;">
+                        <label>Margin (%)</label>
+                        <input type="number" name="margin" value="${tx.margin != null ? tx.margin : 15}" min="0" max="100" step="0.5" required>
+                    </div>
+
+                    <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 3fr 100px 150px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Remarks</span>
+                        <span></span>
+                    </div>
                     <div id="tx-items-container"></div>
                     <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top: 10px;">+ Add Item</button>
 
@@ -475,7 +486,7 @@ class UI {
                     docNumber: formData.get('docNumber'),
                     date: formData.get('date'),
                     clientId: formData.get('clientId'),
-                    customerPo: formData.get('customerPo'),
+                    margin: Number(formData.get('margin')) || 15,
                     status: tx.status || 'Draft',
                     items
                 };
@@ -495,21 +506,23 @@ class UI {
         if (!container) return;
         const idx = this.currentItemIndex++;
         const row = document.createElement('div');
-        row.className = 'tx-item-row grid';
-        row.style.gridTemplateColumns = '2fr 1fr 1fr 2fr 40px';
+        row.className = 'tx-item-row';
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '3fr 100px 150px 2fr 40px';
         row.style.gap = '10px';
-        row.style.marginBottom = '10px';
+        row.style.marginBottom = '8px';
+        row.style.alignItems = 'center';
         row.dataset.index = idx;
 
         row.innerHTML = `
-            <select name="items[${idx}][itemId]" required onchange="window.ui.onItemSelect(this, ${idx})">
+            <select name="items[${idx}][itemId]" required onchange="window.ui.onItemSelect(this, ${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
                 <option value="">Select Product</option>
                 ${window.store.products.map(p => `<option value="${p.id}" ${item && (item.itemId === p.id || item.item_id === p.id) ? 'selected' : ''} data-price="${p.price}">${p.name}</option>`).join('')}
             </select>
-            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required>
-            <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required>
-            <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks">
-            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()">&times;</button>
+            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
+            <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
+            <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
+            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);
     }
