@@ -3,6 +3,12 @@ class UI {
         this.currentItemIndex = 0;
     }
 
+    // Map internal type codes to display names
+    typeLabel(type) {
+        const labels = { QUO: 'Quotation', DO: 'DO', BAP: 'BAST', INV: 'Invoice' };
+        return labels[type] || type;
+    }
+
     renderDashboard() {
         console.log("Rendering Dashboard...");
         try {
@@ -46,7 +52,7 @@ class UI {
                                         <td>${window.formatDate(t.date)}</td>
                                         <td>${t.docNumber || '-'}</td>
                                         <td>${t.clientName || '-'}</td>
-                                        <td>${t.type || '-'}</td>
+                                        <td>${window.ui.typeLabel(t.type) || '-'}</td>
                                         <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
                                     </tr>
                                 `).join('')}
@@ -164,13 +170,16 @@ class UI {
             const txs = (window.store.transactions || []).filter(t => t.type === type);
             const isQuo = type === 'QUO';
             const isDO = type === 'DO';
-            const showPO = isQuo || isDO;
+            const isBAP = type === 'BAP';
+            const showPO = isQuo || isDO || isBAP;
             const colCount = showPO ? 6 : 5;
+            const label = this.typeLabel(type);
+            const hideNewBtn = isDO || isBAP;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header">
-                        <h3>${type} List</h3>
-                        ${isDO ? '' : `<button class="btn btn-primary" onclick="window.ui.openTransactionForm('${type}')"><i class="fa-solid fa-plus"></i> New ${type}</button>`}
+                        <h3>${label} List</h3>
+                        ${hideNewBtn ? '' : `<button class="btn btn-primary" onclick="window.ui.openTransactionForm('${type}')"><i class="fa-solid fa-plus"></i> New ${label}</button>`}
                     </div>
                     <div class="table-container">
                         <table>
@@ -178,7 +187,7 @@ class UI {
                                 <tr><th>Date</th><th>Number</th>${showPO ? '<th>PO Number</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
-                                ${txs.length === 0 ? `<tr><td colspan="${colCount}" style="text-align:center">No ${type} found</td></tr>` :
+                                ${txs.length === 0 ? `<tr><td colspan="${colCount}" style="text-align:center">No ${label} found</td></tr>` :
                     txs.map(t => `
                                     <tr>
                                         <td>${window.formatDate(t.date)}</td>
@@ -611,7 +620,7 @@ class UI {
             };
 
             const content = `
-                <h3>${id ? 'Edit' : 'New'} ${type}</h3>
+                <h3>${id ? 'Edit' : 'New'} ${this.typeLabel(type)}</h3>
                 <form id="transaction-form">
                     <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                         <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required ${!id ? 'readonly style="background:#f1f5f9; cursor:not-allowed;"' : ''}></div>
@@ -893,7 +902,7 @@ class UI {
             // Check duplicate PO number client-side
             const existing = (window.store.transactions || []).find(t => t.customerPo === poNumber && t.id !== txId);
             if (existing) {
-                return alert(`PO Number "${poNumber}" sudah digunakan di ${existing.type} ${existing.docNumber}.`);
+                return alert(`PO Number "${poNumber}" sudah digunakan di ${this.typeLabel(existing.type)} ${existing.docNumber}.`);
             }
 
             try {
@@ -914,22 +923,22 @@ class UI {
             const source = await window.store.getTransaction(sourceId);
             if (!source) return alert('Source transaction not found');
 
-            // Filter items: for DO, only category 'Barang' — remove all Service items
+            // Filter items: for DO, only category 'Barang'; for BAP, only category 'Service'
             let sourceItems = (source.items || []);
-            if (targetType === 'DO') {
+            if (targetType === 'DO' || targetType === 'BAP') {
+                const wantedCat = targetType === 'DO' ? 'barang' : 'service';
+                const unwantedCat = targetType === 'DO' ? 'service' : 'barang';
                 sourceItems = sourceItems.filter(item => {
-                    // Check item's own category
                     const itemCat = (item.category || '').toLowerCase();
-                    // Also check the product's category from the store
                     const pid = item.itemId || item.item_id;
                     const prod = pid ? (window.store.products || []).find(p => p.id === pid) : null;
                     const prodCat = prod ? (prod.category || '').toLowerCase() : '';
-                    // Include only if category is Barang (exclude Service and unknown)
-                    if (itemCat === 'service' || prodCat === 'service') return false;
-                    return itemCat === 'barang' || prodCat === 'barang';
+                    if (itemCat === unwantedCat || prodCat === unwantedCat) return false;
+                    return itemCat === wantedCat || prodCat === wantedCat;
                 });
                 if (sourceItems.length === 0) {
-                    return alert('Tidak ada item kategori Barang untuk dibuat DO.');
+                    const label = targetType === 'DO' ? 'Barang' : 'Service';
+                    return alert(`Tidak ada item kategori ${label} untuk dibuat ${targetType}.`);
                 }
             }
 
@@ -964,9 +973,12 @@ class UI {
     async _openConvertForm(type, tx) {
         try {
             const isDO = type === 'DO';
+            const isBAP = type === 'BAP';
+            const isDraftForm = isDO || isBAP;
+            const lockedCat = isDO ? 'Barang' : 'Service';
             const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
 
-            const itemsHeader = isDO
+            const itemsHeader = isDraftForm
                 ? `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
@@ -985,13 +997,17 @@ class UI {
                         <span></span>
                    </div>`;
 
-            const termsSection = isDO ? '' : `
+            const termsSection = isDraftForm ? '' : `
                     <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
                     <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions...">${tx.terms || ''}</textarea>
             `;
 
+            const addRowFn = isDO ? 'addDoItemRow' : (isBAP ? 'addBastItemRow' : 'addTxItemRow');
+
+            const label = this.typeLabel(type);
+
             const content = `
-                <h3>New ${type} (from Quotation)</h3>
+                <h3>New ${label} (from Quotation)</h3>
                 <form id="transaction-form">
                     <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                         <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required readonly style="background:#f1f5f9; cursor:not-allowed;"></div>
@@ -1008,12 +1024,12 @@ class UI {
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
                     ${itemsHeader}
                     <div id="tx-items-container"></div>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addDoItemRow()" style="margin-top: 10px;">+ Add Item</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.${addRowFn}()" style="margin-top: 10px;">+ Add Item</button>
 
                     ${termsSection}
 
                     <div style="margin-top: 20px;">
-                        <button type="submit" class="btn btn-primary">Save ${type}</button>
+                        <button type="submit" class="btn btn-primary">Save ${label}</button>
                         <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
                     </div>
                 </form>
@@ -1022,13 +1038,12 @@ class UI {
 
             this.currentItemIndex = 0;
             if (tx.items && tx.items.length > 0) {
-                if (isDO) {
-                    tx.items.forEach(item => this.addDoItemRow(item));
-                } else {
-                    tx.items.forEach(item => this.addTxItemRow(item));
-                }
+                if (isDO) tx.items.forEach(item => this.addDoItemRow(item));
+                else if (isBAP) tx.items.forEach(item => this.addBastItemRow(item));
+                else tx.items.forEach(item => this.addTxItemRow(item));
             } else {
                 if (isDO) this.addDoItemRow();
+                else if (isBAP) this.addBastItemRow();
                 else this.addTxItemRow();
             }
 
@@ -1037,7 +1052,7 @@ class UI {
                 const formData = new FormData(e.target);
                 const items = [];
 
-                if (isDO) {
+                if (isDraftForm) {
                     document.querySelectorAll('.tx-item-row').forEach(row => {
                         const idx = row.dataset.index;
                         items.push({
@@ -1045,7 +1060,7 @@ class UI {
                             qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
                             sn: row.querySelector(`input[name="items[${idx}][sn]"]`)?.value || '',
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                            category: 'Barang',
+                            category: lockedCat,
                             price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
                             unit: 'Pcs'
@@ -1120,6 +1135,60 @@ class UI {
         row.innerHTML = `
             <select name="items[${idx}][category]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f1f5f9; cursor:not-allowed;" disabled>
                 <option value="Barang" selected>Barang</option>
+            </select>
+            <div style="position: relative;">
+                <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
+                    oninput="window.ui.onProductSearch(this, ${idx})"
+                    onfocus="window.ui.onProductSearch(this, ${idx})"
+                    style="${inputStyle}">
+                <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
+                <input type="hidden" name="items[${idx}][price]" value="${item ? item.price : 0}">
+                <input type="hidden" name="items[${idx}][margin]" value="${item ? item.margin || 0 : 0}">
+                <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+            </div>
+            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle} text-align: center;">
+            <input type="text" name="items[${idx}][sn]" value="${item ? item.sn || '' : ''}" placeholder="Serial Number" style="${inputStyle}">
+            <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
+            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
+        `;
+        container.appendChild(row);
+
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById(`product-dropdown-${idx}`);
+            if (dropdown && !row.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    addBastItemRow(item = null) {
+        const container = document.getElementById('tx-items-container');
+        if (!container) return;
+        const idx = this.currentItemIndex++;
+
+        let productName = '';
+        let productId = '';
+        if (item) {
+            const pid = item.itemId || item.item_id;
+            productId = pid || '';
+            const found = window.store.products.find(p => p.id === pid);
+            if (found) productName = found.name;
+        }
+
+        const row = document.createElement('div');
+        row.className = 'tx-item-row';
+        row.style.display = 'grid';
+        row.style.gridTemplateColumns = '100px 3fr 80px 2fr 2fr 40px';
+        row.style.gap = '10px';
+        row.style.marginBottom = '8px';
+        row.style.alignItems = 'center';
+        row.dataset.index = idx;
+
+        const inputStyle = 'width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;';
+
+        row.innerHTML = `
+            <select name="items[${idx}][category]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f1f5f9; cursor:not-allowed;" disabled>
+                <option value="Service" selected>Service</option>
             </select>
             <div style="position: relative;">
                 <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"

@@ -73,7 +73,12 @@
         });
 
         const title = document.getElementById('page-title');
-        if (title) title.textContent = view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ');
+        const titleMap = {
+            'dashboard': 'Dashboard', 'clients': 'Clients', 'products': 'Products & Services',
+            'measurements': 'Measurements', 'quotations': 'Quotations', 'delivery-orders': 'Delivery Orders',
+            'bap': 'BAST', 'invoices': 'Invoices', 'settings': 'Settings', 'users': 'Users'
+        };
+        if (title) title.textContent = titleMap[view] || view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ');
 
         // Routing logic
         try {

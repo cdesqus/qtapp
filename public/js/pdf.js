@@ -45,7 +45,7 @@ const printPDF = async (id) => {
     } else if (tx.type === 'INV') {
         generateInvoicePDF(jsPDF, tx, settings, client);
     } else {
-        // Fallback for BAP, etc.
+        // Fallback for BAST, etc.
         const doc = new jsPDF();
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(16);
