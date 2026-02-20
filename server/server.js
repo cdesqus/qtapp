@@ -12,6 +12,11 @@ require('dotenv').config();
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_for_dev_only';
 
+// Health Check
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', time: new Date().toISOString() });
+});
+
 // 1. Security Headers (Helmet)
 app.use(helmet({
     contentSecurityPolicy: {
@@ -99,16 +104,20 @@ app.post('/api/login', loginLimiter, async (req, res) => {
         if (user && (password === user.password || await bcrypt.compare(password, user.password))) {
             const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '8h' });
 
+            const isLocalhost = req.headers.host.includes('localhost') || req.headers.host.includes('127.0.0.1') || req.headers.host.match(/\d+\.\d+\.\d+\.\d+/);
+
             res.cookie('token', token, {
                 httpOnly: true,
-                secure: process.env.NODE_ENV === 'production' && !req.headers.host.includes('localhost'),
-                sameSite: 'lax', // Use 'lax' for better compatibility with redirects
-                maxAge: 8 * 60 * 60 * 1000 // 8 hours
+                secure: process.env.NODE_ENV === 'production' && !isLocalhost,
+                sameSite: 'lax',
+                maxAge: 8 * 60 * 60 * 1000
             });
 
+            console.log(`User ${username} logged in successfully. Secure cookie: ${!isLocalhost && process.env.NODE_ENV === 'production'}`);
             const { password: _, ...userWithoutPassword } = user;
             sendJson(res, userWithoutPassword);
         } else {
+            console.warn(`Failed login attempt for user: ${username}`);
             res.status(401).json({ error: 'Username atau password salah' });
         }
     } catch (err) {

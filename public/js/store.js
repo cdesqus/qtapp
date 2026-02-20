@@ -22,7 +22,18 @@ const Status = {
     REJECTED: 'Rejected'
 };
 
-const API_URL = (window.location.protocol === 'file:') ? 'http://localhost:3020' : '';
+const getBaseURL = () => {
+    const { protocol, hostname, port } = window.location;
+    if (protocol === 'file:') return 'http://localhost:3020';
+    if (hostname.includes('kaumtech.com')) return '';
+    if (port !== '3020' && (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168.'))) {
+        return `${protocol}//${hostname}:3020`;
+    }
+    return ''; // Relative path
+};
+
+const API_URL = getBaseURL();
+console.log("IDE ERP - API URL configured as:", API_URL || "(relative)");
 
 class Store {
     constructor() {
@@ -30,49 +41,48 @@ class Store {
         this.products = [];
         this.units = ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr'];
         this.transactions = [];
-        this.transactionItems = [];
         this.companySettings = {
             name: 'PT. IDE SOLUSI INTEGRASI',
             address: "JL. KH. Abdullah Syafe'i no.23A Kebon Baru Tebet, Jakarta Selatan 12830",
             phone: "021-83796630-32",
-            logo: null,
-            adminName: 'Admin Name',
-            adminSignature: null
+            logo: null
         };
         this.users = [];
         this.currentUser = null;
     }
 
-    // Helper for fetch with credentials
     async apiFetch(url, options = {}) {
         options.credentials = 'include';
         try {
+            console.log(`Fetching: ${url}`);
             const res = await fetch(url, options);
             if (res.status === 401 && !url.includes('/api/login') && !url.includes('/api/me')) {
-                // If unauthorized, redirect to login (or re-render login)
-                this.logout();
-                window.location.reload();
+                console.warn("Session expired or unauthorized");
+                this.currentUser = null;
                 return null;
             }
             return res;
         } catch (err) {
-            console.error("API Fetch Error:", err);
+            console.error(`Fetch error for ${url}:`, err);
             throw err;
         }
     }
 
     async init() {
         try {
-            // Check if user is already logged in
+            console.log("Store initializing...");
             const meRes = await this.apiFetch(`${API_URL}/api/me`);
             if (meRes && meRes.ok) {
                 this.currentUser = await meRes.json();
+                console.log("Logged in as:", this.currentUser.username);
             } else {
+                console.log("No active session.");
                 this.currentUser = null;
-                return; // Stop init if not logged in
+                return;
             }
 
-            await Promise.all([
+            // Load all data
+            const results = await Promise.allSettled([
                 this.loadClients(),
                 this.loadProducts(),
                 this.loadTransactions(),
@@ -80,23 +90,25 @@ class Store {
                 this.loadUsers(),
                 this.loadSettings()
             ]);
+
+            results.forEach((r, i) => {
+                if (r.status === 'rejected') console.error(`Failed to load data at index ${i}:`, r.reason);
+            });
+
+            console.log("Store init complete.");
         } catch (err) {
             console.error("Initialization error:", err);
         }
     }
 
     async loadUsers() {
-        try {
-            const res = await this.apiFetch(`${API_URL}/api/users`);
-            if (res && res.ok) this.users = await res.json();
-        } catch (e) { }
+        const res = await this.apiFetch(`${API_URL}/api/users`);
+        if (res && res.ok) this.users = await res.json();
     }
 
     async loadUnits() {
-        try {
-            const res = await this.apiFetch(`${API_URL}/api/units`);
-            if (res && res.ok) this.units = await res.json();
-        } catch (e) { }
+        const res = await this.apiFetch(`${API_URL}/api/units`);
+        if (res && res.ok) this.units = await res.json();
     }
 
     async loadClients() {
@@ -125,15 +137,17 @@ class Store {
     }
 
     async login(username, password) {
-        const res = await this.apiFetch(`${API_URL}/api/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ username, password })
-        });
-        if (res && res.ok) {
-            this.currentUser = await res.json();
-            return true;
-        }
+        try {
+            const res = await this.apiFetch(`${API_URL}/api/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+            if (res && res.ok) {
+                this.currentUser = await res.json();
+                return true;
+            }
+        } catch (e) { console.error("Login failed:", e); }
         return false;
     }
 
@@ -167,6 +181,11 @@ class Store {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
+        await this.loadClients();
+    }
+
+    async deleteClient(id) {
+        await this.apiFetch(`${API_URL}/api/clients/${id}`, { method: 'DELETE' });
         await this.loadClients();
     }
 
@@ -207,15 +226,6 @@ class Store {
         await this.loadUnits();
     }
 
-    async updateUser(id, newData) {
-        await this.apiFetch(`${API_URL}/api/users/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(newData)
-        });
-        await this.loadUsers();
-    }
-
     async addTransaction(transaction, items) {
         const res = await this.apiFetch(`${API_URL}/api/transactions`, {
             method: 'POST',
@@ -245,7 +255,6 @@ class Store {
         return await (res ? res.json() : null);
     }
 
-    // ... Rest of the helper methods (generateNextDocNumber, calculateTotal, etc) are unchanged
     generateNextDocNumber(type, dateStr) {
         const date = dateStr ? new Date(dateStr) : new Date();
         const year = date.getFullYear();
@@ -258,7 +267,7 @@ class Store {
         else if (type === DocumentTypes.INVOICE) prefix = `INV${year}${month}`;
         else prefix = `${type}${year}${month}`;
 
-        const matches = this.transactions
+        const matches = (this.transactions || [])
             .filter(t => t.type === type && t.docNumber && t.docNumber.startsWith(prefix));
 
         let sequence = 1;
@@ -268,40 +277,6 @@ class Store {
         }
 
         return `${prefix}${String(sequence).padStart(3, '0')}`;
-    }
-
-    calculateItemTax(item) {
-        const subtotal = item.price * item.qty;
-        let dpp, ppn, pph23 = 0;
-
-        if (item.category === 'Barang') {
-            const lineTotal = subtotal;
-            dpp = (lineTotal * 11) / 12;
-            ppn = dpp * 0.12;
-        } else {
-            dpp = subtotal;
-            ppn = dpp * 0.12;
-            pph23 = dpp * 0.02;
-        }
-        return { subtotal, dpp, ppn, pph23 };
-    }
-
-    calculateTotal(items, type = null) {
-        if (!items) return 0;
-        if (type && type !== DocumentTypes.INVOICE) {
-            return items.reduce((sum, item) => sum + (item.price * item.qty), 0);
-        }
-
-        let grandTotal = 0;
-        items.forEach(item => {
-            const tax = this.calculateItemTax(item);
-            if (item.category === 'Service') {
-                grandTotal += (tax.dpp + tax.ppn - tax.pph23);
-            } else {
-                grandTotal += (tax.dpp + tax.ppn);
-            }
-        });
-        return grandTotal;
     }
 }
 
