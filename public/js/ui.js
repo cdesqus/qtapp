@@ -1091,6 +1091,7 @@ class UI {
 
         row.innerHTML = `
             <div style="position: relative;">
+                <select name="items[${idx}][category]" style="display:none;"><option value="Barang" selected>Barang</option></select>
                 <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
                     oninput="window.ui.onProductSearch(this, ${idx})"
                     onfocus="window.ui.onProductSearch(this, ${idx})"
