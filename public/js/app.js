@@ -4,7 +4,13 @@
     }
 
     async init() {
-        await window.store.init();
+        try {
+            await window.store.init();
+        } catch (err) {
+            console.error("Store initialization failed:", err);
+            // Even if it fails, we want UI logic to bind if possible
+        }
+
         if (!window.store.currentUser) {
             this.renderLogin();
         } else {
@@ -32,6 +38,11 @@
         if (window.store.currentUser) {
             document.getElementById('user-display-name').textContent = window.store.currentUser.username;
             document.getElementById('user-avatar').textContent = window.store.currentUser.username.charAt(0).toUpperCase();
+
+            if (window.store.currentUser.role === 'admin') {
+                document.getElementById('nav-settings').style.display = 'block';
+                document.getElementById('nav-users').style.display = 'block';
+            }
         }
 
         // Modal Close
@@ -45,11 +56,22 @@
         });
 
         const title = document.getElementById('page-title');
-        title.textContent = view.charAt(0).toUpperCase() + view.slice(1);
+        title.textContent = view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ');
 
         // Routing logic
-        if (view === 'dashboard') window.ui.renderDashboard();
-        // More views will be handled by UI module
+        switch (view) {
+            case 'dashboard': window.ui.renderDashboard(); break;
+            case 'clients': window.ui.renderClients(); break;
+            case 'products': window.ui.renderProducts(); break;
+            case 'measurements': window.ui.renderMeasurements(); break;
+            case 'quotations': window.ui.renderTransactions('QUO'); break;
+            case 'delivery-orders': window.ui.renderTransactions('DO'); break;
+            case 'bap': window.ui.renderTransactions('BAP'); break;
+            case 'invoices': window.ui.renderTransactions('INV'); break;
+            case 'users': window.ui.renderUsers(); break;
+            case 'settings': window.ui.renderSettings(); break;
+            default: console.warn("View not found:", view);
+        }
     }
 
     renderLogin() {
