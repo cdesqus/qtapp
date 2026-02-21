@@ -784,20 +784,26 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     const items = tx.items || [];
     const resolvedItems = items.map(item => {
         let name = item.itemName || item.item_name || '';
+        let desc = item.itemDescription || item.item_description || '';
         if (!name && item.itemId) {
             const prod = window.store.products.find(p => p.id === item.itemId);
-            if (prod) name = prod.name;
+            if (prod) { name = prod.name; desc = prod.description || ''; }
         }
-        return { ...item, resolvedName: name };
+        return { ...item, resolvedName: name, resolvedDesc: desc };
     });
 
     const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'STATUS']];
-    const tableBody = resolvedItems.map((item, i) => [
-        String(i + 1),
-        item.resolvedName || '-',
-        String(item.qty || 0),
-        'Completed'
-    ]);
+    const tableBody = resolvedItems.map((item, i) => {
+        const namePart = item.resolvedName || '-';
+        const descPart = item.resolvedDesc ? `\n${item.resolvedDesc}` : '';
+        const remarkPart = item.remarks ? `\n${item.remarks}` : '';
+        return [
+            String(i + 1),
+            namePart + descPart + remarkPart,
+            String(item.qty || 0),
+            'Completed'
+        ];
+    });
 
     doc.autoTable({
         startY: y,
@@ -1207,9 +1213,13 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         // colSpan:6 merges across all 6 columns
         tableBody.push([{ content: catLabel, colSpan: 6 }]);
         categoryMap[cat].forEach(item => {
+            const namePart = item.resolvedName || '-';
+            const descPart = item.resolvedDesc ? `\n${item.resolvedDesc}` : '';
+            const remarkPart = item.remarks ? `\n${item.remarks}` : '';
+            const descText = namePart + descPart + remarkPart;
             tableBody.push([
                 String(itemNo++),
-                item.resolvedName + (item.remarks ? '\n' + item.remarks : ''),
+                descText,
                 String(item.qty || 0),
                 item.unit || 'Pcs',
                 fmtCurrency(item.sellingPrice),
