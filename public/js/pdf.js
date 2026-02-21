@@ -1344,73 +1344,91 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     if (dueDate) { doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y); y += 4; }
     y += 4;
 
-    // ── PAYMENT INFORMATION (plain text below catatan) ─────────────
+    // ── PAYMENT INFORMATION + SIGNATURE (side by side) ────────────
+    const payStartY = y;
+
+    // --- RIGHT: Signature (starts at same Y as payment header) ---
+    const sigBoxW = 68;
+    const sigBoxX = pageW - mR - sigBoxW;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Hormat kami,', sigBoxX + sigBoxW / 2, payStartY, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.DARK);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigBoxX + sigBoxW / 2, payStartY + 5, { align: 'center' });
+
+    const sigLineY = payStartY + 43;
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.4);
+    doc.line(sigBoxX + 6, sigLineY, sigBoxX + sigBoxW - 6, sigLineY);
+
+    const currentUser = window.store.currentUser;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.DARK);
+    doc.text(currentUser?.username || 'Authorized', sigBoxX + sigBoxW / 2, sigLineY + 5, { align: 'center' });
+
+    // --- LEFT: Payment text (constrained width, left of signature) ---
     if (hasBank || hasBank2) {
+        const payMaxX = sigBoxX - 8;
+        const lblX = mL;       // label start
+        const colonX = mL + 26;  // colon column (fixed)
+        const valX = mL + 30;  // value start
+
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8);
         doc.setTextColor(...C.PRIMARY);
-        doc.text('Transfer Pembayaran ke:', mL, y);
+        doc.text('Transfer Pembayaran ke:', lblX, y);
         y += 4.5;
 
-        const printBank = (bankName, bankAccount, bankHolder, label) => {
+        const printBankText = (bankName, bankAccount, bankHolder, bankAddress, bankSwift, label) => {
             if (!bankName && !bankAccount) return;
             if (label) {
                 doc.setFont('helvetica', 'bold');
                 doc.setFontSize(7.8);
                 doc.setTextColor(...C.DARK);
-                doc.text(label, mL, y); y += 3.8;
+                doc.text(label, lblX, y); y += 4;
             }
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(7.8);
-            doc.setTextColor(...C.SECONDARY);
-            if (bankName) { doc.text(`Bank          : ${bankName}`, mL + 4, y); y += 3.8; }
-            if (bankAccount) { doc.text(`No. Rekening  : ${bankAccount}`, mL + 4, y); y += 3.8; }
-            if (bankHolder) { doc.text(`Atas Nama     : ${bankHolder}`, mL + 4, y); y += 3.8; }
+            const rows = [
+                ['Bank', bankName],
+                ['No. Rekening', bankAccount],
+                ['Atas Nama', bankHolder],
+                ['Alamat Bank', bankAddress],
+                ['SWIFT/BIC', bankSwift],
+            ];
+            rows.forEach(([lbl, val]) => {
+                if (!val) return;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(7.8);
+                doc.setTextColor(...C.SECONDARY);
+                doc.text(lbl, lblX + 4, y);
+                doc.text(':', colonX, y);
+                const wrapped = doc.splitTextToSize(String(val), payMaxX - valX);
+                doc.text(wrapped, valX, y);
+                y += wrapped.length * 3.8;
+            });
         };
 
         if (hasBank && hasBank2) {
-            printBank(settings.bankName, settings.bankAccount, settings.bankHolder, 'Rekening 1:');
+            printBankText(settings.bankName, settings.bankAccount, settings.bankHolder,
+                settings.bankAddress, settings.bankSwift, 'Rekening 1:');
             y += 2;
-            printBank(settings.bank2Name, settings.bank2Account, settings.bank2Holder, 'Rekening 2:');
+            printBankText(settings.bank2Name, settings.bank2Account, settings.bank2Holder,
+                settings.bank2Address, settings.bank2Swift, 'Rekening 2:');
         } else if (hasBank) {
-            printBank(settings.bankName, settings.bankAccount, settings.bankHolder, null);
+            printBankText(settings.bankName, settings.bankAccount, settings.bankHolder,
+                settings.bankAddress, settings.bankSwift, null);
         } else {
-            printBank(settings.bank2Name, settings.bank2Account, settings.bank2Holder, null);
+            printBankText(settings.bank2Name, settings.bank2Account, settings.bank2Holder,
+                settings.bank2Address, settings.bank2Swift, null);
         }
-        y += 4;
     }
 
-    // ── SIGNATURE AREA (below notes, right side) ───────────────
-    const sigBoxW = 70;
-    const sigBoxX = pageW - mR - sigBoxW;
-    const sigStartY = y;
-
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...C.SECONDARY);
-    doc.text('Hormat kami,', sigBoxX + sigBoxW / 2, sigStartY, { align: 'center' });
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...C.DARK);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigBoxX + sigBoxW / 2, sigStartY + 5, { align: 'center' });
-
-    // Empty signature space — cukup untuk materai (~35mm)
-    const sigLineY = sigStartY + 43;
-    doc.setDrawColor(...C.BORDER);
-    doc.setLineWidth(0.4);
-    doc.line(sigBoxX + 6, sigLineY, sigBoxX + sigBoxW - 6, sigLineY);
-
-    // Username centered below line
-    const currentUser = window.store.currentUser;
-    const sigCenterX = sigBoxX + sigBoxW / 2;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.DARK);
-    doc.text(currentUser?.username || 'Authorized', sigCenterX, sigLineY + 5, { align: 'center' });
-
-    y = sigLineY + 10;
+    y = Math.max(y + 4, sigLineY + 10);
 
     // ── FOOTER ────────────────────────────────────────────────────
     const footY = pageH - 8;

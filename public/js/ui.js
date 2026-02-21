@@ -546,12 +546,16 @@
                             <div class="form-group"><label>Nama Bank</label><input type="text" name="bankName" value="${s.bankName || ''}" placeholder="Contoh: Bank BCA"></div>
                             <div class="form-group"><label>Nomor Rekening</label><input type="text" name="bankAccount" value="${s.bankAccount || ''}" placeholder="Contoh: 123-456-7890"></div>
                             <div class="form-group"><label>Atas Nama</label><input type="text" name="bankHolder" value="${s.bankHolder || ''}" placeholder="Nama pemilik rekening"></div>
+                            <div class="form-group"><label>Alamat Bank</label><input type="text" name="bankAddress" value="${s.bankAddress || ''}" placeholder="Contoh: Jl. Sudirman No.1, Jakarta"></div>
+                            <div class="form-group"><label>SWIFT / BIC Code</label><input type="text" name="bankSwift" value="${s.bankSwift || ''}" placeholder="Contoh: CENAIDJA"></div>
                         </div>
                         <h4 style="margin-bottom: 15px; margin-top: 15px; color: var(--text-secondary);"><i class="fa-solid fa-building-columns" style="margin-right: 8px;"></i>Bank Information II (Secondary)</h4>
                         <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                             <div class="form-group"><label>Nama Bank</label><input type="text" name="bank2Name" value="${s.bank2Name || ''}" placeholder="Contoh: Bank Mandiri"></div>
                             <div class="form-group"><label>Nomor Rekening</label><input type="text" name="bank2Account" value="${s.bank2Account || ''}" placeholder="Contoh: 987-654-3210"></div>
                             <div class="form-group"><label>Atas Nama</label><input type="text" name="bank2Holder" value="${s.bank2Holder || ''}" placeholder="Nama pemilik rekening"></div>
+                            <div class="form-group"><label>Alamat Bank</label><input type="text" name="bank2Address" value="${s.bank2Address || ''}" placeholder="Contoh: Jl. Thamrin No.1, Jakarta"></div>
+                            <div class="form-group"><label>SWIFT / BIC Code</label><input type="text" name="bank2Swift" value="${s.bank2Swift || ''}" placeholder="Contoh: BMRIIDJA"></div>
                         </div>
                         <div class="form-group">
                             <label>Company Logo</label>
@@ -588,9 +592,13 @@
                     bankName: formData.get('bankName'),
                     bankAccount: formData.get('bankAccount'),
                     bankHolder: formData.get('bankHolder'),
+                    bankAddress: formData.get('bankAddress'),
+                    bankSwift: formData.get('bankSwift'),
                     bank2Name: formData.get('bank2Name'),
                     bank2Account: formData.get('bank2Account'),
-                    bank2Holder: formData.get('bank2Holder')
+                    bank2Holder: formData.get('bank2Holder'),
+                    bank2Address: formData.get('bank2Address'),
+                    bank2Swift: formData.get('bank2Swift')
                 };
                 if (logoData) data.logo = logoData;
                 else if (logoData === '__REMOVE__') data.logo = '';
