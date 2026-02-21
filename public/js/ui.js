@@ -541,11 +541,17 @@
                         <div class="form-group"><label>Phone</label><input type="text" name="phone" value="${s.phone || ''}"></div>
                         <div class="form-group"><label>NPWP Perusahaan</label><input type="text" name="npwp" value="${s.npwp || ''}" placeholder="Contoh: 01.234.567.8-901.000"></div>
                         <hr style="margin: 20px 0; border-color: var(--border-color);">
-                        <h4 style="margin-bottom: 15px; color: var(--text-secondary);"><i class="fa-solid fa-building-columns" style="margin-right: 8px;"></i>Bank Information (for Invoice)</h4>
+                        <h4 style="margin-bottom: 15px; color: var(--text-secondary);"><i class="fa-solid fa-building-columns" style="margin-right: 8px;"></i>Bank Information I (for Invoice)</h4>
                         <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
                             <div class="form-group"><label>Nama Bank</label><input type="text" name="bankName" value="${s.bankName || ''}" placeholder="Contoh: Bank BCA"></div>
                             <div class="form-group"><label>Nomor Rekening</label><input type="text" name="bankAccount" value="${s.bankAccount || ''}" placeholder="Contoh: 123-456-7890"></div>
                             <div class="form-group"><label>Atas Nama</label><input type="text" name="bankHolder" value="${s.bankHolder || ''}" placeholder="Nama pemilik rekening"></div>
+                        </div>
+                        <h4 style="margin-bottom: 15px; margin-top: 15px; color: var(--text-secondary);"><i class="fa-solid fa-building-columns" style="margin-right: 8px;"></i>Bank Information II (Secondary)</h4>
+                        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                            <div class="form-group"><label>Nama Bank</label><input type="text" name="bank2Name" value="${s.bank2Name || ''}" placeholder="Contoh: Bank Mandiri"></div>
+                            <div class="form-group"><label>Nomor Rekening</label><input type="text" name="bank2Account" value="${s.bank2Account || ''}" placeholder="Contoh: 987-654-3210"></div>
+                            <div class="form-group"><label>Atas Nama</label><input type="text" name="bank2Holder" value="${s.bank2Holder || ''}" placeholder="Nama pemilik rekening"></div>
                         </div>
                         <div class="form-group">
                             <label>Company Logo</label>
@@ -581,7 +587,10 @@
                     npwp: formData.get('npwp'),
                     bankName: formData.get('bankName'),
                     bankAccount: formData.get('bankAccount'),
-                    bankHolder: formData.get('bankHolder')
+                    bankHolder: formData.get('bankHolder'),
+                    bank2Name: formData.get('bank2Name'),
+                    bank2Account: formData.get('bank2Account'),
+                    bank2Holder: formData.get('bank2Holder')
                 };
                 if (logoData) data.logo = logoData;
                 else if (logoData === '__REMOVE__') data.logo = '';

@@ -376,7 +376,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setFontSize(7.5);
     doc.setTextColor(...DO_COLORS.SECONDARY);
 
-    let companyLine = (settings.address || '');
+    let companyLine = (settings.address || '').replace(/Tebet,\s*/i, 'Tebet,\n');
     if (settings.phone) companyLine += `  \u2022  Telp: ${settings.phone}`;
     if (settings.email) companyLine += `  \u2022  ${settings.email}`;
     const companyLines = doc.splitTextToSize(companyLine, 100);
@@ -1080,19 +1080,17 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...C.PRIMARY);
     doc.text('INVOICE', pageW - mR, y + 10, { align: 'right' });
 
-    // Address & phone below company name (aligned to nameX)
+    // Address & phone below company name (aligned to nameX) — all on one line flow
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...C.SECONDARY);
-    const rawAddr = (settings.address || '').split('\n').map(l => l.trim()).filter(Boolean);
-    if (settings.phone) rawAddr.push(`Telp: ${settings.phone}`);
+    let addrStr = (settings.address || '').replace(/\n/g, ' ').trim();
+    if (settings.phone) addrStr += `  •  Telp: ${settings.phone}`;
     const addrMaxW = (pageW - mL - mR) / 2 - 4;
     let addrY = y + 11;  // start just below company name text
-    rawAddr.forEach(line => {
-        const wrapped = doc.splitTextToSize(line, addrMaxW);
-        doc.text(wrapped, nameX, addrY);
-        addrY += wrapped.length * 3.4;
-    });
+    const addrWrapped = doc.splitTextToSize(addrStr, addrMaxW);
+    doc.text(addrWrapped, nameX, addrY);
+    addrY += addrWrapped.length * 3.4;
     if (settings.npwp) {
         doc.text(`NPWP: ${settings.npwp}`, nameX, addrY);
         addrY += 3.4;
@@ -1242,16 +1240,12 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         alternateRowStyles: { fillColor: C.LIGHT_BG },
         didParseCell: (data) => {
             if (data.section === 'body' && categoryRowIndices.has(data.row.index)) {
-                // Style category header rows
-                data.cell.styles.fillColor = [0, 82, 155];
-                data.cell.styles.textColor = [255, 255, 255];
+                // Style category header rows — light grey, bold, no color
+                data.cell.styles.fillColor = [241, 245, 249];
+                data.cell.styles.textColor = [30, 41, 59];
                 data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.fontSize = 7.5;
                 data.cell.styles.cellPadding = { top: 3, bottom: 3, left: 6, right: 4 };
-                if (data.column.index !== 1) {
-                    data.cell.styles.textColor = [0, 82, 155]; // hide empty cells
-                    data.cell.styles.fillColor = [0, 82, 155];
-                }
             }
         }
     });
@@ -1328,7 +1322,8 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
 
     // ── PAYMENT INFO + QR CODE ────────────────────────────────────
     const hasBank = settings.bankName || settings.bankAccount || settings.bankHolder;
-    if (hasBank || qrDataUrl) {
+    const hasBank2 = settings.bank2Name || settings.bank2Account || settings.bank2Holder;
+    if (hasBank || hasBank2 || qrDataUrl) {
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(8.5);
         doc.setTextColor(...C.PRIMARY);
@@ -1336,35 +1331,47 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         y += 5;
 
         const qrSize = 30;
-        const bankColW = W - qrSize - 10;
+        // Split available width: bank1 | bank2 | QR
+        const numBanks = (hasBank ? 1 : 0) + (hasBank2 ? 1 : 0);
+        const totalBankW = W - (qrDataUrl ? qrSize + 10 : 0);
+        const bankBoxW = numBanks > 1 ? (totalBankW - 8) / 2 : totalBankW;
 
-        // Bank details box
-        doc.setFillColor(...C.LIGHT_BG);
-        doc.setDrawColor(...C.BORDER);
-        doc.setLineWidth(0.3);
-        doc.roundedRect(mL, y, bankColW, qrSize + 4, 2, 2, 'FD');
+        const drawBankBox = (startX, boxW, bankName, bankAccount, bankHolder) => {
+            doc.setFillColor(...C.LIGHT_BG);
+            doc.setDrawColor(...C.BORDER);
+            doc.setLineWidth(0.3);
+            doc.roundedRect(startX, y, boxW, qrSize + 4, 2, 2, 'FD');
+            let by = y + 6;
+            const rows = [
+                ['Bank', bankName || '-'],
+                ['No. Rek.', bankAccount || '-'],
+                ['Atas Nama', bankHolder || '-'],
+            ];
+            rows.forEach(([lbl, val]) => {
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(...C.SECONDARY);
+                doc.text(lbl, startX + 5, by);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(...C.DARK);
+                doc.text(val, startX + 28, by);
+                by += 5.5;
+            });
+        };
 
-        let by = y + 6;
-        const bankRows = [
-            ['Bank', settings.bankName || '-'],
-            ['No. Rek.', settings.bankAccount || '-'],
-            ['Atas Nama', settings.bankHolder || '-'],
-        ];
-        bankRows.forEach(([lbl, val]) => {
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor(...C.SECONDARY);
-            doc.text(lbl, mL + 5, by);
-            doc.setFont('helvetica', 'bold');
-            doc.setTextColor(...C.DARK);
-            doc.text(val, mL + 28, by);
-            by += 5.5;
-        });
+        let bankStartX = mL;
+        if (hasBank) {
+            drawBankBox(bankStartX, bankBoxW, settings.bankName, settings.bankAccount, settings.bankHolder);
+            bankStartX += bankBoxW + 8;
+        }
+        if (hasBank2) {
+            drawBankBox(bankStartX, bankBoxW, settings.bank2Name, settings.bank2Account, settings.bank2Holder);
+        }
 
         // QR Code
         if (qrDataUrl) {
             try {
-                const qrX = mL + bankColW + 10;
+                const qrX = mL + totalBankW + 10;
                 doc.setDrawColor(...C.BORDER);
                 doc.setLineWidth(0.3);
                 doc.roundedRect(qrX - 2, y, qrSize + 4, qrSize + 4, 2, 2, 'S');
