@@ -170,7 +170,11 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         const sellingPrice = basePrice * (1 + margin / 100);
         const qty = Number(item.qty) || 0;
         const amount = sellingPrice * qty;
-        const descText = item.resolvedName + (item.remarks ? '\n' + item.remarks : '');
+        // Build description: product name + optional description line + optional remarks
+        const namePart = item.resolvedName || '-';
+        const descPart = item.resolvedDesc ? `\n${item.resolvedDesc}` : '';
+        const remarkPart = item.remarks ? `\n${item.remarks}` : '';
+        const descText = namePart + descPart + remarkPart;
         return [
             String(i + 1),
             descText,
@@ -515,12 +519,12 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
             halign: 'center'
         },
         columnStyles: {
-            0: { cellWidth: 16, halign: 'center' },
-            1: { cellWidth: 'auto' },
+            0: { cellWidth: 12, halign: 'center' },
+            1: { cellWidth: 'auto' },       // Description — gets all remaining space
             2: { cellWidth: 18, halign: 'center' },
             3: { cellWidth: 18, halign: 'center' },
-            4: { cellWidth: 38 },
-            5: { cellWidth: 38 }
+            4: { cellWidth: 28 },            // Serial Number — reduced from 38
+            5: { cellWidth: 28 }             // Remarks — reduced from 38
         },
         alternateRowStyles: {
             fillColor: DO_COLORS.LIGHT_BG
@@ -562,10 +566,10 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
         });
     }
 
-    y += 25;
+    y += 20;
 
     // ── Check page break for signatures ──
-    const sigSpace = 65;
+    const sigSpace = 60;
     if (y + sigSpace > pageH - 15) {
         doc.addPage();
         y = 25;
