@@ -1,4 +1,4 @@
-class UI {
+﻿class UI {
     constructor() {
         this.currentItemIndex = 0;
     }
@@ -101,15 +101,16 @@ class UI {
                     <div class="table-container">
                         <table>
                             <thead>
-                                <tr><th>Name</th><th>Email</th><th>Nomor NPWP</th><th>Actions</th></tr>
+                                <tr><th>Name</th><th>Email</th><th>PIC</th><th>Nomor NPWP</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
-                                ${clients.length === 0 ? '<tr><td colspan="4" style="text-align:center">No clients found</td></tr>' :
+                                ${clients.length === 0 ? '<tr><td colspan="5" style="text-align:center">No clients found</td></tr>' :
                     clients.map(c => `
                                     <tr>
                                         <td>${c.name}</td>
                                         <td>${c.email || '-'}</td>
-                                        <td>${c.npwpNumber || '-'}</td>
+                                        <td>${c.pic || '-'}</td>
+                                        <td>${c.npwpNumber || c.npwp_number || '-'}</td>
                                         <td>
                                             <button class="btn btn-sm btn-secondary" onclick="window.ui.openClientForm('${c.id}')"><i class="fa-solid fa-edit"></i></button>
                                             <button class="btn btn-sm btn-error" onclick="window.ui.deleteClient('${c.id}')"><i class="fa-solid fa-trash"></i></button>
@@ -200,9 +201,9 @@ class UI {
                                             <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${t.id}')" title="Print"><i class="fa-solid fa-print"></i></button>
                                             ${isQuo ? `
                                                 <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);" onclick="window.ui.confirmPO('${t.id}')" title="Confirm PO"><i class="fa-solid fa-check-circle"></i> PO</button>
-                                                <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'DO')" title="To DO">→DO</button>
-                                                <button class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'BAP')" title="To BAST">→BAST</button>
-                                                <button class="btn btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'INV')" title="To Invoice">→INV</button>
+                                                <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'DO')" title="To DO">â†’DO</button>
+                                                <button class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'BAP')" title="To BAST">â†’BAST</button>
+                                                <button class="btn btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'INV')" title="To Invoice">â†’INV</button>
                                             ` : ''}
                                             <button class="btn btn-sm btn-error" onclick="window.ui.deleteTransaction('${t.id}', '${type}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
                                         </td>
@@ -347,7 +348,7 @@ class UI {
         const user = (window.store.users || []).find(u => u.id === userId);
         if (!user) return;
         const content = `
-            <h3>Edit Signature — ${user.username}</h3>
+            <h3>Edit Signature â€” ${user.username}</h3>
             <div style="margin-top: 15px;">
                 <div id="edit-sig-preview" style="width: 200px; height: 100px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: white; margin-bottom: 15px;">
                     ${user.signature ? `<img src="${user.signature}" style="max-width: 100%; max-height: 100%; object-fit: contain;">` : '<span style="color: var(--text-secondary); font-size: 0.8rem;">No signature</span>'}
@@ -417,6 +418,7 @@ class UI {
                         <div class="form-group"><label>Company Name</label><input type="text" name="name" value="${s.name || ''}"></div>
                         <div class="form-group"><label>Address</label><textarea name="address">${s.address || ''}</textarea></div>
                         <div class="form-group"><label>Phone</label><input type="text" name="phone" value="${s.phone || ''}"></div>
+                        <div class="form-group"><label>NPWP Perusahaan</label><input type="text" name="npwp" value="${s.npwp || ''}" placeholder="Contoh: 01.234.567.8-901.000"></div>
                         <div class="form-group">
                             <label>Company Logo</label>
                             <div style="display: flex; align-items: center; gap: 20px; margin-top: 8px;">
@@ -447,7 +449,8 @@ class UI {
                 const data = {
                     name: formData.get('name'),
                     address: formData.get('address'),
-                    phone: formData.get('phone')
+                    phone: formData.get('phone'),
+                    npwp: formData.get('npwp')
                 };
                 if (logoData) data.logo = logoData;
                 else if (logoData === '__REMOVE__') data.logo = '';
@@ -502,17 +505,18 @@ class UI {
     }
 
     openClientForm(id = null) {
-        const client = id ? window.store.clients.find(c => c.id === id) : { name: '', email: '', address: '', npwpNumber: '' };
+        const client = id ? window.store.clients.find(c => c.id === id) : { name: '', email: '', address: '', npwpNumber: '', pic: '' };
         if (!client) return;
         const content = `
             <h3>${id ? 'Edit' : 'New'} Client</h3>
             <form id="client-form">
                 <div class="form-group"><label>Name</label><input type="text" name="name" value="${client.name}" required></div>
                 <div class="form-group"><label>Email</label><input type="email" name="email" value="${client.email || ''}"></div>
+                <div class="form-group"><label>PIC (Person In Charge)</label><input type="text" name="pic" value="${client.pic || ''}" placeholder="Nama kontak PIC"></div>
                 <div class="form-group"><label>Address</label><textarea name="address">${client.address || ''}</textarea></div>
                 <div class="form-group">
                     <label>Nomor NPWP</label>
-                    <input type="text" name="npwpNumber" value="${client.npwpNumber || ''}" placeholder="Masukkan Nomor NPWP (opsional)">
+                    <input type="text" name="npwpNumber" value="${client.npwpNumber || client.npwp_number || ''}" placeholder="Masukkan Nomor NPWP (opsional)">
                 </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn btn-primary">Save Client</button>
@@ -529,6 +533,7 @@ class UI {
                 name: formData.get('name'),
                 email: formData.get('email'),
                 address: formData.get('address'),
+                pic: formData.get('pic') || '',
                 npwp: npwpVal.length > 0,
                 npwpNumber: npwpVal
             };
@@ -626,7 +631,7 @@ class UI {
 
             let itemsHeaderHtml, addRowFn;
             if (isDO) {
-                // DO: Category | Product | Qty | SN | Remarks | ✕
+                // DO: Category | Product | Qty | SN | Remarks | âœ•
                 itemsHeaderHtml = `
                     <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
@@ -638,7 +643,7 @@ class UI {
                     </div>`;
                 addRowFn = 'addDoItemRow';
             } else if (isBAP) {
-                // BAST: Category | Product | Qty | SN | ✕
+                // BAST: Category | Product | Qty | SN | âœ•
                 itemsHeaderHtml = `
                     <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
@@ -649,7 +654,7 @@ class UI {
                     </div>`;
                 addRowFn = 'addBastItemRow';
             } else {
-                // QUO/INV: Category | Product | Qty | Unit | Price | Margin | Remarks | ✕
+                // QUO/INV: Category | Product | Qty | Unit | Price | Margin | Remarks | âœ•
                 itemsHeaderHtml = `
                     <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>

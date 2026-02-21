@@ -82,6 +82,7 @@ pool.connect(async (err, client, release) => {
         // Auto-migrations
         try {
             await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS signature TEXT');
+            await client.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS pic TEXT');
             console.log('✅ Database migrations applied');
         } catch (e) { console.error('Migration warning:', e.message); }
         release();
@@ -240,11 +241,11 @@ app.get('/api/clients', authenticate, async (req, res) => {
 });
 
 app.post('/api/clients', authenticate, async (req, res) => {
-    const { name, address, email, npwp, npwpNumber } = req.body;
+    const { name, address, email, npwp, npwpNumber, pic } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO clients (name, address, email, npwp, npwp_number) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, address, email, npwp, npwpNumber]
+            'INSERT INTO clients (name, address, email, npwp, npwp_number, pic) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, address, email, npwp, npwpNumber, pic || null]
         );
         sendJson(res, result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
@@ -252,11 +253,11 @@ app.post('/api/clients', authenticate, async (req, res) => {
 
 app.put('/api/clients/:id', authenticate, async (req, res) => {
     const { id } = req.params;
-    const { name, address, email, npwp, npwpNumber } = req.body;
+    const { name, address, email, npwp, npwpNumber, pic } = req.body;
     try {
         await pool.query(
-            'UPDATE clients SET name=$1, address=$2, email=$3, npwp=$4, npwp_number=$5 WHERE id=$6',
-            [name, address, email, npwp, npwpNumber, id]
+            'UPDATE clients SET name=$1, address=$2, email=$3, npwp=$4, npwp_number=$5, pic=$6 WHERE id=$7',
+            [name, address, email, npwp, npwpNumber, pic || null, id]
         );
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }
