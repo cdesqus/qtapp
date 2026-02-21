@@ -619,6 +619,56 @@ class UI {
                 items: []
             };
 
+            const isDO = type === 'DO';
+            const isBAP = type === 'BAP';
+            const isDraftForm = isDO || isBAP;
+            const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
+
+            let itemsHeaderHtml, addRowFn;
+            if (isDO) {
+                // DO: Category | Product | Qty | SN | Remarks | ✕
+                itemsHeaderHtml = `
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Category</span>
+                        <span style="${headerStyle}">Product</span>
+                        <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Serial Number</span>
+                        <span style="${headerStyle}">Remarks</span>
+                        <span></span>
+                    </div>`;
+                addRowFn = 'addDoItemRow';
+            } else if (isBAP) {
+                // BAST: Category | Product | Qty | SN | ✕
+                itemsHeaderHtml = `
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Category</span>
+                        <span style="${headerStyle}">Product</span>
+                        <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Serial Number</span>
+                        <span></span>
+                    </div>`;
+                addRowFn = 'addBastItemRow';
+            } else {
+                // QUO/INV: Category | Product | Qty | Unit | Price | Margin | Remarks | ✕
+                itemsHeaderHtml = `
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Category</span>
+                        <span style="${headerStyle}">Product</span>
+                        <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Unit</span>
+                        <span style="${headerStyle}">Price</span>
+                        <span style="${headerStyle}">Margin %</span>
+                        <span style="${headerStyle}">Remarks</span>
+                        <span></span>
+                    </div>`;
+                addRowFn = 'addTxItemRow';
+            }
+
+            const termsSection = isDraftForm ? '' : `
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
+                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions..."></textarea>
+            `;
+
             const content = `
                 <h3>${id ? 'Edit' : 'New'} ${this.typeLabel(type)}</h3>
                 <form id="transaction-form">
@@ -633,26 +683,21 @@ class UI {
                             </select>
                         </div>
                     </div>
+                    ${isBAP ? `
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>PO Number</label>
+                        <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Customer PO Number">
+                    </div>` : ''}
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Category</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Product</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Qty</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Unit</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Price</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Margin %</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;">Remarks</span>
-                        <span></span>
-                    </div>
+                    ${itemsHeaderHtml}
                     <div id="tx-items-container"></div>
-                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top: 10px;">+ Add Item</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.${addRowFn}()" style="margin-top: 10px;">+ Add Item</button>
 
-                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
-                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions..."></textarea>
+                    ${termsSection}
 
                     <div style="margin-top: 20px;">
-                        <button type="submit" class="btn btn-primary">Save ${type}</button>
+                        <button type="submit" class="btn btn-primary">Save ${this.typeLabel(type)}</button>
                         <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
                     </div>
                 </form>
@@ -660,44 +705,81 @@ class UI {
             this.openModal(content);
             this.currentItemIndex = 0;
             this.currentTermIndex = 0;
+
             if (tx.items && tx.items.length > 0) {
-                tx.items.forEach(item => this.addTxItemRow(item));
+                if (isDO) tx.items.forEach(item => this.addDoItemRow(item));
+                else if (isBAP) tx.items.forEach(item => this.addBastItemRow(item));
+                else tx.items.forEach(item => this.addTxItemRow(item));
             } else {
-                this.addTxItemRow();
+                if (isDO) this.addDoItemRow();
+                else if (isBAP) this.addBastItemRow();
+                else this.addTxItemRow();
             }
 
-            // Load terms
-            const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled';
-            const termsEl = document.getElementById('tx-terms');
-            if (tx.terms && typeof tx.terms === 'string' && tx.terms.trim().length > 0) {
-                termsEl.value = tx.terms;
-            } else {
-                termsEl.value = defaultTerms;
+            // Load terms (only for QUO/INV)
+            if (!isDraftForm) {
+                const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled';
+                const termsEl = document.getElementById('tx-terms');
+                if (tx.terms && typeof tx.terms === 'string' && tx.terms.trim().length > 0) {
+                    termsEl.value = tx.terms;
+                } else {
+                    termsEl.value = defaultTerms;
+                }
             }
 
             document.getElementById('transaction-form').onsubmit = async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.target);
                 const items = [];
-                document.querySelectorAll('.tx-item-row').forEach(row => {
-                    const idx = row.dataset.index;
-                    items.push({
-                        itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
-                        qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
-                        price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
-                        margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
-                        remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
-                        category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
-                        unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
-                    });
-                });
 
-                // Collect terms
-                const termsText = document.getElementById('tx-terms').value.trim();
+                if (isDraftForm) {
+                    document.querySelectorAll('.tx-item-row').forEach(row => {
+                        const idx = row.dataset.index;
+                        const lockedCat = isDO ? 'Barang' : 'Service';
+                        items.push({
+                            itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                            sn: row.querySelector(`input[name="items[${idx}][sn]"]`)?.value || '',
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
+                            category: lockedCat,
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
+                            unit: 'Pcs'
+                        });
+                    });
+                } else {
+                    document.querySelectorAll('.tx-item-row').forEach(row => {
+                        const idx = row.dataset.index;
+                        items.push({
+                            itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
+                            category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                            unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
+                        });
+                    });
+                }
+
+                const termsEl = document.getElementById('tx-terms');
+                const termsText = termsEl ? termsEl.value.trim() : '';
+
+                // For BAST, check duplicate PO number client-side before submission
+                const customerPoVal = formData.get('customerPo') || tx.customerPo || '';
+                if (isBAP && customerPoVal) {
+                    const existing = (window.store.transactions || []).find(
+                        t => t.type === 'BAP' && t.customerPo === customerPoVal && t.id !== id
+                    );
+                    if (existing) {
+                        return alert(`PO Number "${customerPoVal}" sudah digunakan di BAST ${existing.docNumber}.`);
+                    }
+                }
 
                 const data = {
                     type,
                     docNumber: formData.get('docNumber'),
+                    customerPo: customerPoVal,
                     date: formData.get('date'),
                     clientId: formData.get('clientId'),
                     status: tx.status || 'Draft',
@@ -944,6 +1026,16 @@ class UI {
 
             // Build a virtual transaction as a draft to open in form
             const newDocNumber = window.store.generateNextDocNumber(targetType);
+
+            // Check duplicate PO for DO and BAP
+            if ((targetType === 'DO' || targetType === 'BAP') && source.customerPo) {
+                const existingDup = (window.store.transactions || []).find(t => t.type === targetType && t.customerPo === source.customerPo);
+                if (existingDup) {
+                    const label = this.typeLabel(targetType);
+                    return alert(`Sudah ada ${label} dengan PO Number "${source.customerPo}" (${existingDup.docNumber}).`);
+                }
+            }
+
             const draftTx = {
                 type: targetType,
                 docNumber: newDocNumber,
@@ -978,16 +1070,26 @@ class UI {
             const lockedCat = isDO ? 'Barang' : 'Service';
             const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
 
-            const itemsHeader = isDraftForm
-                ? `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+            let itemsHeader;
+            if (isDO) {
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
                         <span style="${headerStyle}">Serial Number</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
-                   </div>`
-                : `<div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                   </div>`;
+            } else if (isBAP) {
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">Category</span>
+                        <span style="${headerStyle}">Product</span>
+                        <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Serial Number</span>
+                        <span></span>
+                   </div>`;
+            } else {
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -996,14 +1098,14 @@ class UI {
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                    </div>`;
+            }
 
             const termsSection = isDraftForm ? '' : `
-                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms & Conditions</h4>
-                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms & conditions...">${tx.terms || ''}</textarea>
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Terms &amp; Conditions</h4>
+                    <textarea id="tx-terms" name="terms" rows="5" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.6; resize: vertical;" placeholder="Enter terms &amp; conditions...">${tx.terms || ''}</textarea>
             `;
 
             const addRowFn = isDO ? 'addDoItemRow' : (isBAP ? 'addBastItemRow' : 'addTxItemRow');
-
             const label = this.typeLabel(type);
 
             const content = `
@@ -1020,6 +1122,11 @@ class UI {
                             </select>
                         </div>
                     </div>
+                    ${isBAP ? `
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>PO Number</label>
+                        <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Customer PO Number">
+                    </div>` : ''}
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
                     ${itemsHeader}
@@ -1059,7 +1166,7 @@ class UI {
                             itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
                             qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
                             sn: row.querySelector(`input[name="items[${idx}][sn]"]`)?.value || '',
-                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
                             category: lockedCat,
                             price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
@@ -1084,10 +1191,21 @@ class UI {
                 const termsEl = document.getElementById('tx-terms');
                 const termsText = termsEl ? termsEl.value.trim() : '';
 
+                // For BAST create-from-conversion, check duplicate PO client-side
+                const customerPoVal = isBAP ? (formData.get('customerPo') || tx.customerPo || '') : (tx.customerPo || '');
+                if (isBAP && customerPoVal) {
+                    const existing = (window.store.transactions || []).find(
+                        t => t.type === 'BAP' && t.customerPo === customerPoVal
+                    );
+                    if (existing) {
+                        return alert(`PO Number "${customerPoVal}" sudah digunakan di BAST ${existing.docNumber}.`);
+                    }
+                }
+
                 const data = {
                     type,
                     docNumber: formData.get('docNumber'),
-                    customerPo: tx.customerPo,
+                    customerPo: customerPoVal,
                     date: formData.get('date'),
                     clientId: formData.get('clientId'),
                     status: 'Draft',
@@ -1098,10 +1216,7 @@ class UI {
                 try {
                     await window.store.addTransaction(data, items);
                     this.closeModal();
-                    const menuMap = { DO: 'delivery-orders', BAP: 'bap', INV: 'invoices' };
-                    if (menuMap[type]) {
-                        document.querySelector(`[data-page="${menuMap[type]}"]`)?.click();
-                    }
+                    this.renderTransactions(type);
                 } catch (err) { alert("Gagal menyimpan: " + err.message); }
             };
         } catch (err) { alert("Gagal membuka form: " + err.message); }
@@ -1178,7 +1293,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '100px 3fr 80px 2fr 2fr 40px';
+        row.style.gridTemplateColumns = '100px 3fr 80px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -1202,7 +1317,6 @@ class UI {
             </div>
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle} text-align: center;">
             <input type="text" name="items[${idx}][sn]" value="${item ? item.sn || '' : ''}" placeholder="Serial Number" style="${inputStyle}">
-            <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);

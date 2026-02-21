@@ -337,12 +337,13 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const { type, docNumber, customerPo, date, clientId, terms, status, items } = req.body;
 
-        // Check duplicate PO number — only for DO type
-        if (type === 'DO' && customerPo) {
-            const dup = await client.query("SELECT id FROM transactions WHERE customer_po = $1 AND type = 'DO'", [customerPo]);
+        // Check duplicate PO number — for DO and BAP (BAST) types
+        if ((type === 'DO' || type === 'BAP') && customerPo) {
+            const dup = await client.query("SELECT id FROM transactions WHERE customer_po = $1 AND type = $2", [customerPo, type]);
             if (dup.rows.length > 0) {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ error: `Sudah ada Delivery Order dengan PO Number "${customerPo}".` });
+                const label = type === 'DO' ? 'Delivery Order' : 'BAST';
+                return res.status(400).json({ error: `Sudah ada ${label} dengan PO Number "${customerPo}".` });
             }
         }
 
@@ -391,14 +392,15 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
         await client.query('BEGIN');
         const { docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, signature } = req.body;
 
-        // Check duplicate PO number — only for DO type
+        // Check duplicate PO number — for DO and BAP (BAST) types
         const existingTx = await client.query('SELECT type FROM transactions WHERE id = $1', [id]);
         const txType = existingTx.rows[0]?.type;
-        if (txType === 'DO' && customerPo) {
-            const dup = await client.query("SELECT id FROM transactions WHERE customer_po = $1 AND type = 'DO' AND id != $2", [customerPo, id]);
+        if ((txType === 'DO' || txType === 'BAP') && customerPo) {
+            const dup = await client.query("SELECT id FROM transactions WHERE customer_po = $1 AND type = $2 AND id != $3", [customerPo, txType, id]);
             if (dup.rows.length > 0) {
                 await client.query('ROLLBACK');
-                return res.status(400).json({ error: `Sudah ada Delivery Order lain dengan PO Number "${customerPo}".` });
+                const label = txType === 'DO' ? 'Delivery Order' : 'BAST';
+                return res.status(400).json({ error: `Sudah ada ${label} lain dengan PO Number "${customerPo}".` });
             }
         }
 
