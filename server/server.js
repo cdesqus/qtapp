@@ -327,7 +327,7 @@ app.get('/api/transactions', authenticate, async (req, res) => {
             `SELECT ti.*, p.name as item_name, p.description as item_description
              FROM transaction_items ti
              LEFT JOIN products p ON ti.item_id = p.id
-             WHERE ti.transaction_id = ANY($1::int[])`,
+             WHERE ti.transaction_id = ANY($1::uuid[])`,
             [txIds]
         );
 
