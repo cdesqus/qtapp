@@ -201,11 +201,13 @@
                                             <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${t.id}')" title="Print"><i class="fa-solid fa-print"></i></button>
                                             ${isQuo ? `
                                                 <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);" onclick="window.ui.confirmPO('${t.id}')" title="Confirm PO"><i class="fa-solid fa-check-circle"></i> PO</button>
-                                                <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'DO')" title="To DO">â†’DO</button>
-                                                <button class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'BAP')" title="To BAST">â†’BAST</button>
-                                                <button class="btn btn-sm" style="background:rgba(245,158,11,0.12);color:#f59e0b;border:1px solid rgba(245,158,11,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'INV')" title="To Invoice">â†’INV</button>
+                                                <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'DO')" title="To DO">→DO</button>
+                                                <button class="btn btn-sm" style="background:rgba(168,85,247,0.12);color:#a855f7;border:1px solid rgba(168,85,247,0.3);" onclick="window.ui.convertTransaction('${t.id}', 'BAP')" title="To BAST">→BAST</button>
                                             ` : ''}
-                                            <button class="btn btn-sm btn-error" onclick="window.ui.deleteTransaction('${t.id}', '${type}')" title="Delete"><i class="fa-solid fa-trash"></i></button>
+                                            ${isQuo && (t.customerPo || t.customer_po)
+                            ? `<button class="btn btn-sm btn-error" disabled title="Quotation dengan PO Confirmed tidak bisa dihapus" style="opacity:0.4;cursor:not-allowed;"><i class="fa-solid fa-lock"></i></button>`
+                            : `<button class="btn btn-sm btn-error" onclick="window.ui.deleteTransaction('${t.id}', '${type}')" title="Delete"><i class="fa-solid fa-trash"></i></button>`
+                        }
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -216,6 +218,118 @@
             `;
         } catch (err) {
             this.showErrorMessage(`Gagal memuat ${type}: ` + err.message);
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  INVOICE MANAGEMENT — Quotation dengan PO Confirmed
+    // ══════════════════════════════════════════════════════════
+    renderInvoiceManagement() {
+        try {
+            const container = document.getElementById('content-area');
+            const allTx = window.store.transactions || [];
+            // Normalize field access helper
+            const po = t => t.customerPo || t.customer_po || '';
+            const cid = t => t.clientId || t.client_id || '';
+            const dn = t => t.docNumber || t.doc_number || '';
+
+            const quos = allTx.filter(t => t.type === 'QUO' && po(t).trim() !== '');
+            const doList = allTx.filter(t => t.type === 'DO');
+            const bastList = allTx.filter(t => t.type === 'BAP');
+            const invList = allTx.filter(t => t.type === 'INV');
+
+            const fmt = (dateStr) => {
+                if (!dateStr) return '-';
+                const d = new Date(dateStr);
+                if (isNaN(d)) return '-';
+                return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            };
+
+            const rows = quos.map(q => {
+                const linkedDO = doList.find(d => cid(d) === cid(q) && po(d) === po(q))
+                    || doList.find(d => cid(d) === cid(q));
+                const linkedBAST = bastList.find(b => cid(b) === cid(q) && po(b) === po(q))
+                    || bastList.find(b => cid(b) === cid(q));
+                const linkedINV = invList.find(i => cid(i) === cid(q) && po(i) === po(q))
+                    || invList.find(i => cid(i) === cid(q));
+                const isPaid = linkedINV && (linkedINV.status || '').toLowerCase() === 'paid';
+                return { q, linkedDO, linkedBAST, linkedINV, isPaid };
+            });
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;color:var(--primary);"></i>Invoice Management</h3>
+                        <span style="font-size:0.85rem;color:var(--text-secondary);">${rows.length} Quotation dengan PO Confirmed</span>
+                    </div>
+                    <div class="table-container">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>No. Quotation</th>
+                                    <th>Client</th>
+                                    <th>Status PO</th>
+                                    <th>No. DO</th>
+                                    <th>Tanggal DO</th>
+                                    <th>No. BAST</th>
+                                    <th>Tanggal BAST</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows.length === 0
+                    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-secondary);">Belum ada Quotation dengan PO Confirmed.</td></tr>'
+                    : rows.map(({ q, linkedDO, linkedBAST, linkedINV, isPaid }) => `
+                                    <tr>
+                                        <td>
+                                            <span style="font-weight:600;color:var(--primary);">${q.docNumber || q.doc_number || '-'}</span><br>
+                                            <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(q.date)}</span>
+                                        </td>
+                                        <td>${q.clientName || q.client_name || '-'}</td>
+                                        <td>
+                                            <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);">
+                                                <i class="fa-solid fa-circle-check"></i> ${q.customerPo || q.customer_po}
+                                            </span>
+                                        </td>
+                                        <td>${linkedDO ? `<span style="font-weight:600;">${linkedDO.docNumber || linkedDO.doc_number || '-'}</span>` : '<span style="color:var(--text-secondary);">-</span>'}</td>
+                                        <td style="font-size:0.85rem;">${linkedDO ? fmt(linkedDO.date) : '-'}</td>
+                                        <td>${linkedBAST ? `<span style="font-weight:600;">${linkedBAST.docNumber || linkedBAST.doc_number || '-'}</span>` : '<span style="color:var(--text-secondary);">-</span>'}</td>
+                                        <td style="font-size:0.85rem;">${linkedBAST ? fmt(linkedBAST.date) : '-'}</td>
+                                        <td>
+                                            ${linkedINV
+                            ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;${isPaid
+                                ? 'background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);'
+                                : 'background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);'}">
+                                                    <i class="fa-solid ${isPaid ? 'fa-circle-check' : 'fa-clock'}"></i>
+                                                    ${isPaid ? 'Paid' : 'Unpaid'}
+                                                </span>`
+                            : `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:500;background:rgba(100,116,139,0.1);color:var(--text-secondary);border:1px solid var(--border-color);">
+                                                    <i class="fa-regular fa-file"></i> No Invoice
+                                                </span>`}
+                                        </td>
+                                        <td style="white-space:nowrap;display:flex;gap:5px;flex-wrap:wrap;">
+                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.openTransactionForm('QUO','${q.id}')" title="Edit Quotation">
+                                                <i class="fa-solid fa-edit"></i>
+                                            </button>
+                                            <button class="btn btn-sm" style="background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);font-weight:600;"
+                                                onclick="window.ui.convertTransaction('${q.id}','INV')" title="Generate Invoice">
+                                                <i class="fa-solid fa-file-invoice-dollar"></i> Invoice
+                                            </button>
+                                            ${linkedINV ? `
+                                            <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${linkedINV.id}')" title="Print Invoice">
+                                                <i class="fa-solid fa-print"></i>
+                                            </button>` : ''}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            this.showErrorMessage('Gagal memuat Invoice Management: ' + err.message);
         }
     }
 

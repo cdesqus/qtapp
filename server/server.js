@@ -373,6 +373,14 @@ app.post('/api/transactions', authenticate, async (req, res) => {
 
 app.delete('/api/transactions/:id', authenticate, async (req, res) => {
     try {
+        // Guard: Quotation with confirmed PO cannot be deleted
+        const check = await pool.query('SELECT type, customer_po FROM transactions WHERE id = $1', [req.params.id]);
+        if (check.rows.length > 0) {
+            const { type, customer_po } = check.rows[0];
+            if (type === 'QUO' && customer_po && customer_po.trim() !== '') {
+                return res.status(400).json({ error: `Quotation dengan PO Confirmed ("${customer_po}") tidak bisa dihapus.` });
+            }
+        }
         await pool.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);
         res.json({ success: true });
     } catch (err) { res.status(500).json({ error: err.message }); }

@@ -76,7 +76,7 @@
         const titleMap = {
             'dashboard': 'Dashboard', 'clients': 'Clients', 'products': 'Products & Services',
             'measurements': 'Measurements', 'quotations': 'Quotations', 'delivery-orders': 'Delivery Orders',
-            'bap': 'BAST', 'invoices': 'Invoices', 'settings': 'Settings', 'users': 'Users'
+            'bap': 'BAST', 'invoices': 'Invoice Management', 'settings': 'Settings', 'users': 'Users'
         };
         if (title) title.textContent = titleMap[view] || view.charAt(0).toUpperCase() + view.slice(1).replace('-', ' ');
 
@@ -90,7 +90,7 @@
                 case 'quotations': window.ui.renderTransactions('QUO'); break;
                 case 'delivery-orders': window.ui.renderTransactions('DO'); break;
                 case 'bap': window.ui.renderTransactions('BAP'); break;
-                case 'invoices': window.ui.renderTransactions('INV'); break;
+                case 'invoices': window.ui.renderInvoiceManagement(); break;
                 case 'users': window.ui.renderUsers(); break;
                 case 'settings': window.ui.renderSettings(); break;
                 default: console.warn("View not found:", view);

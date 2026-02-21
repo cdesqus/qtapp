@@ -289,7 +289,11 @@ class Store {
     }
 
     async deleteTransaction(id) {
-        await this.apiFetch(`${API_URL}/api/transactions/${id}`, { method: 'DELETE' });
+        const res = await this.apiFetch(`${API_URL}/api/transactions/${id}`, { method: 'DELETE' });
+        if (res && !res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Gagal menghapus transaksi.');
+        }
         await this.loadTransactions();
     }
 
