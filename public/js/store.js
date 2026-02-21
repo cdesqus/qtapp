@@ -271,8 +271,10 @@ class Store {
             const err = await res.json();
             throw new Error(err.error || 'Gagal menyimpan transaksi');
         }
+        // Read body FIRST before loadTransactions (body can only be consumed once)
+        const result = res ? await res.json() : null;
         await this.loadTransactions();
-        return await (res ? res.json() : null);
+        return result;
     }
 
     async updateTransaction(id, data, items) {
