@@ -348,6 +348,28 @@ app.get('/api/transactions', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Server-side next doc number (always accurate) ──
+app.get('/api/next-doc-number', authenticate, async (req, res) => {
+    const { type, date } = req.query;
+    try {
+        const d = date ? new Date(date) : new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const prefixMap = { QUO: `QT${year}${month}`, DO: `DO#${year}${month}`, BAP: `HOP${year}${month}`, INV: `INV${year}${month}` };
+        const prefix = prefixMap[type] || `${type}${year}${month}`;
+        const result = await pool.query(
+            "SELECT doc_number FROM transactions WHERE type = $1 AND doc_number LIKE $2 ORDER BY doc_number DESC",
+            [type, `${prefix}%`]
+        );
+        let seq = 1;
+        if (result.rows.length > 0) {
+            const nums = result.rows.map(r => parseInt(r.doc_number.replace(prefix, '')) || 0);
+            seq = Math.max(...nums) + 1;
+        }
+        res.json({ docNumber: `${prefix}${String(seq).padStart(3, '0')}` });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 
 app.get('/api/transactions/:id', authenticate, async (req, res) => {
     try {
@@ -373,21 +395,39 @@ app.post('/api/transactions', authenticate, async (req, res) => {
             }
         }
 
-        const txResult = await client.query(
-            'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-            [type, docNumber, customerPo, date, clientId, terms, status, invoiceNotes || null]
-        );
-        const txId = txResult.rows[0].id;
-
-        for (const item of items) {
-            await client.query(
-                'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                [txId, item.itemId, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
-            );
+        // Auto-resolve duplicate doc_number by incrementing sequence
+        let finalDocNumber = docNumber;
+        let attempt = 0;
+        while (attempt < 10) {
+            try {
+                const txResult = await client.query(
+                    'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+                    [type, finalDocNumber, customerPo, date, clientId, terms, status, invoiceNotes || null]
+                );
+                const txId = txResult.rows[0].id;
+                for (const item of items) {
+                    await client.query(
+                        'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
+                        [txId, item.itemId, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
+                    );
+                }
+                await client.query('COMMIT');
+                return sendJson(res, { id: txId, docNumber: finalDocNumber });
+            } catch (insertErr) {
+                if (insertErr.constraint === 'transactions_doc_number_key' || (insertErr.message && insertErr.message.includes('transactions_doc_number_key'))) {
+                    // Increment the sequence number and retry
+                    attempt++;
+                    const match = finalDocNumber.match(/^(.*?)(\d+)$/);
+                    if (match) {
+                        const nextSeq = parseInt(match[2]) + 1;
+                        finalDocNumber = match[1] + String(nextSeq).padStart(match[2].length, '0');
+                    } else { throw insertErr; }
+                    await client.query('ROLLBACK');
+                    await client.query('BEGIN');
+                } else { throw insertErr; }
+            }
         }
-
-        await client.query('COMMIT');
-        sendJson(res, { id: txId });
+        throw new Error('Could not generate unique document number after 10 attempts');
     } catch (err) {
         await client.query('ROLLBACK');
         res.status(500).json({ error: err.message });
@@ -420,7 +460,6 @@ app.delete('/api/transactions/all/purge', authenticate, async (req, res) => {
         res.json({ success: true, message: 'All transactions cleared.' });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
-
 
 app.patch('/api/transactions/:id/status', authenticate, async (req, res) => {
     const { status } = req.body;
@@ -500,3 +539,4 @@ app.post('/api/settings', authenticate, async (req, res) => {
 
 const PORT = process.env.PORT || 3020;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
