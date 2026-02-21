@@ -763,6 +763,32 @@
                         <button type="submit" class="btn btn-primary">Save Settings</button>
                     </form>
                 </div>
+
+                <!-- ── Danger Zone ── -->
+                <div class="card" style="margin-top: 24px; border: 1px solid rgba(239,68,68,0.35); background: rgba(239,68,68,0.04);">
+                    <div class="card-header" style="border-bottom: 1px solid rgba(239,68,68,0.2);">
+                        <h3 style="color: var(--error); display:flex; align-items:center; gap:8px;">
+                            <i class="fa-solid fa-triangle-exclamation"></i> Danger Zone
+                        </h3>
+                    </div>
+                    <div style="padding: 20px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; padding: 16px; border: 1px solid rgba(239,68,68,0.25); border-radius: 8px; background: rgba(239,68,68,0.05);">
+                            <div>
+                                <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 4px;">
+                                    <i class="fa-solid fa-trash-can" style="color:var(--error); margin-right:6px;"></i>
+                                    Hapus Semua Data Transaksi
+                                </div>
+                                <div style="font-size: 0.82rem; color: var(--text-secondary);">
+                                    Menghapus semua data <strong>Quotation, DO, BAST, dan Invoice</strong>. Data clients, products, dan users <strong>tidak akan terhapus</strong>.
+                                </div>
+                            </div>
+                            <button id="btn-clear-transactions" class="btn" style="background:var(--error); color:white; white-space:nowrap; margin-left:20px; padding: 10px 18px; font-weight:600;"
+                                onclick="window.ui.clearTransactionData()">
+                                <i class="fa-solid fa-trash-can"></i> Hapus Data Transaksi
+                            </button>
+                        </div>
+                    </div>
+                </div>
             `;
 
             // Wire up settings form submit
@@ -1877,6 +1903,49 @@
             const dropdown = document.getElementById(`product-dropdown-${idx}`);
             if (dropdown && !row.contains(e.target)) dropdown.style.display = 'none';
         });
+    }
+
+    async clearTransactionData() {
+        // Double confirmation untuk keamanan
+        const first = confirm(
+            '⚠️ PERHATIAN!\n\n' +
+            'Anda akan menghapus SEMUA data berikut:\n' +
+            '  • Quotation\n' +
+            '  • Delivery Order (DO)\n' +
+            '  • BAST\n' +
+            '  • Invoice\n\n' +
+            'Data clients, products, dan users TIDAK akan terhapus.\n\n' +
+            'Apakah Anda yakin ingin melanjutkan?'
+        );
+        if (!first) return;
+
+        const second = prompt(
+            'Untuk konfirmasi, ketik "HAPUS" (huruf kapital) lalu tekan OK:'
+        );
+        if (second !== 'HAPUS') {
+            if (second !== null) alert('Konfirmasi tidak sesuai. Penghapusan dibatalkan.');
+            return;
+        }
+
+        const btn = document.getElementById('btn-clear-transactions');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menghapus...'; }
+
+        try {
+            const res = await fetch('/api/transactions/all/purge', {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Gagal menghapus data');
+
+            // Refresh store data
+            await window.store.loadTransactions();
+            alert('✅ Berhasil! Semua data Quotation, DO, BAST, dan Invoice telah dihapus.');
+            this.renderSettings();
+        } catch (err) {
+            alert('❌ Gagal menghapus: ' + err.message);
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Hapus Data Transaksi'; }
+        }
     }
 }
 
