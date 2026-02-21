@@ -309,9 +309,6 @@
                                                 </span>`}
                                         </td>
                                         <td style="white-space:nowrap;display:flex;gap:5px;flex-wrap:wrap;">
-                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.openTransactionForm('QUO','${q.id}')" title="Edit Quotation">
-                                                <i class="fa-solid fa-edit"></i>
-                                            </button>
                                             <button class="btn btn-sm" style="background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);font-weight:600;"
                                                 onclick="window.ui.convertTransaction('${q.id}','INV')" title="Generate Invoice">
                                                 <i class="fa-solid fa-file-invoice-dollar"></i> Invoice
@@ -1310,6 +1307,21 @@
                 document.getElementById('transaction-form').onsubmit = async (e) => {
                     e.preventDefault();
                     const fd = new FormData(e.target);
+                    const poVal = (fd.get('customerPo') || '').trim();
+
+                    // ── Cek duplikat PO ───────────────────────────────
+                    if (poVal) {
+                        const allTx = window.store.transactions || [];
+                        const dupINV = allTx.find(t =>
+                            t.type === 'INV' &&
+                            (t.customerPo || t.customer_po || '').trim() === poVal
+                        );
+                        if (dupINV) {
+                            return alert(`Invoice dengan PO "${poVal}" sudah ada: ${dupINV.docNumber || dupINV.doc_number}.\nTidak bisa membuat invoice duplikat.`);
+                        }
+                    }
+                    // ─────────────────────────────────────────────────
+
                     const items = [];
                     document.querySelectorAll('.tx-item-row').forEach(row => {
                         const idx = row.dataset.index;
@@ -1319,14 +1331,13 @@
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
                             category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
                             unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
-                            // Price carried from source quotation item
                             price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
                         });
                     });
                     const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '' };
                     const data = {
-                        type: 'INV', docNumber: fd.get('docNumber'), customerPo: fd.get('customerPo') || '',
+                        type: 'INV', docNumber: fd.get('docNumber'), customerPo: poVal,
                         date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
                         invoiceNotes: JSON.stringify(invMeta), items
                     };

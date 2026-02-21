@@ -1054,12 +1054,21 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         doc.restoreGraphicsState();
     }
 
-    // ── HEADER: Company Info (left) | Logo (right) | "INVOICE" ────
-    const logoH = 24;
-    // Logo — top right
+    // ── HEADER: Company Info (left) | Logo + INVOICE (right) ─────
+    const logoH = 16;
+    const logoW = 24;
+    const logoX = pageW - mR - logoW;
+
+    // Logo — top right, smaller
     if (settings.logo) {
-        try { doc.addImage(settings.logo, 'AUTO', pageW - mR - 30, y, 30, logoH); } catch (e) { }
+        try { doc.addImage(settings.logo, 'AUTO', logoX, y, logoW, logoH); } catch (e) { }
     }
+
+    // "INVOICE" right-aligned below logo
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('INVOICE', pageW - mR, y + logoH + 6, { align: 'right' });
 
     // Company info — left
     doc.setFont('helvetica', 'bold');
@@ -1070,21 +1079,21 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.8);
     doc.setTextColor(...C.SECONDARY);
-    let compLine = (settings.address || '').replace(/\n/g, '  ·  ');
-    if (settings.phone) compLine += `  ·  Telp: ${settings.phone}`;
-    const compLines = doc.splitTextToSize(compLine, 110);
-    doc.text(compLines, mL, y + 13);
+    // Split address on actual newlines, then append phone
+    const rawAddr = (settings.address || '').split('\n').map(l => l.trim()).filter(Boolean);
+    if (settings.phone) rawAddr.push(`Telp: ${settings.phone}`);
+    let addrY = y + 13;
+    rawAddr.forEach(line => {
+        const wrapped = doc.splitTextToSize(line, logoX - mL - 6);
+        doc.text(wrapped, mL, addrY);
+        addrY += wrapped.length * 3.5;
+    });
     if (settings.npwp) {
-        doc.text(`NPWP: ${settings.npwp}`, mL, y + 13 + compLines.length * 3.5);
+        doc.text(`NPWP: ${settings.npwp}`, mL, addrY);
+        addrY += 3.5;
     }
 
-    // "INVOICE" title bold centered-right
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(30);
-    doc.setTextColor(...C.PRIMARY);
-    doc.text('INVOICE', pageW - mR - 32, y + logoH + 8, { align: 'right' });
-
-    y += Math.max(logoH, 22) + 12;
+    y += Math.max(logoH + 10, addrY - y + 4) + 4;
 
     // ── Accent separator line ────────────────────────────────────
     doc.setDrawColor(...C.PRIMARY);
@@ -1148,32 +1157,10 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     drawDocRow('Invoice Date', fmtDate(tx.date));
     if (dueDate) drawDocRow('Due Date', fmtDate(dueDate));
     if (tx.customerPo || tx.customer_po) drawDocRow('PO Reference', tx.customerPo || tx.customer_po);
+    if (doRef) drawDocRow('DO Reference', doRef);
+    if (bastRef) drawDocRow('BAST Reference', bastRef);
 
     y = Math.max(y + 6, ry + 4);
-
-    // ── REFERENCES BOX (DO & BAST) ───────────────────────────────
-    if (doRef || bastRef) {
-        doc.setFillColor(...C.LIGHT_BG);
-        doc.setDrawColor(...C.BORDER);
-        doc.setLineWidth(0.3);
-        doc.roundedRect(mL, y, W, 12, 2, 2, 'FD');
-        doc.setFillColor(...C.PRIMARY);
-        doc.roundedRect(mL, y, 3, 12, 1, 1, 'F');
-
-        let refText = '';
-        if (doRef) refText += `DO Ref: ${doRef}`;
-        if (doRef && bastRef) refText += '   |   ';
-        if (bastRef) refText += `BAST Ref: ${bastRef}`;
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
-        doc.setTextColor(...C.PRIMARY);
-        doc.text('References:', mL + 7, y + 5);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(...C.DARK);
-        doc.text(refText, mL + 34, y + 5);
-        y += 18;
-    }
 
     // ── ITEMS TABLE ───────────────────────────────────────────────
     const items = tx.items || [];
@@ -1369,40 +1356,6 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
     if (dueDate) doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y);
     y += 8;
-
-    // ── SIGNATURE ─────────────────────────────────────────────────
-    if (y + 45 > pageH - 20) { doc.addPage(); y = 25; }
-
-    const sigRX = pageW - mR - 40;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...C.SECONDARY);
-    doc.text('Hormat kami,', sigRX, y, { align: 'center' });
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...C.DARK);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigRX, y + 4, { align: 'center' });
-
-    const currentUser = window.store.currentUser;
-    const loggedUser = (window.store.users || []).find(u => u.username === currentUser?.username);
-    if (loggedUser?.signature) {
-        try { doc.addImage(loggedUser.signature, 'AUTO', sigRX - 22, y + 6, 44, 22); } catch (e) { }
-    }
-
-    y += 34;
-    doc.setDrawColor(...C.BORDER);
-    doc.setLineWidth(0.4);
-    doc.line(sigRX - 28, y, sigRX + 28, y);
-    y += 4;
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...C.DARK);
-    doc.text(currentUser?.username || 'Authorized', sigRX, y, { align: 'center' });
-    y += 4;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...C.SECONDARY);
-    doc.text('Finance / Accounting', sigRX, y, { align: 'center' });
 
     // ── FOOTER ────────────────────────────────────────────────────
     const footY = pageH - 8;
