@@ -312,17 +312,42 @@ app.delete('/api/products/:id', authenticate, async (req, res) => {
 app.get('/api/transactions', authenticate, async (req, res) => {
     const { type } = req.query;
     try {
-        let query = 'SELECT t.*, c.name as client_name FROM transactions t LEFT JOIN clients c ON t.client_id = c.id';
+        // Fetch transactions
+        let txQuery = 'SELECT t.*, c.name as client_name FROM transactions t LEFT JOIN clients c ON t.client_id = c.id';
         const params = [];
-        if (type) {
-            query += ' WHERE t.type = $1';
-            params.push(type);
-        }
-        query += ' ORDER BY t.date DESC';
-        const result = await pool.query(query, params);
-        sendJson(res, result.rows);
+        if (type) { txQuery += ' WHERE t.type = $1'; params.push(type); }
+        txQuery += ' ORDER BY t.date DESC';
+        const txResult = await pool.query(txQuery, params);
+
+        if (txResult.rows.length === 0) return sendJson(res, []);
+
+        // Fetch all items for those transactions in one query
+        const txIds = txResult.rows.map(r => r.id);
+        const itemsResult = await pool.query(
+            `SELECT ti.*, p.name as item_name, p.description as item_description
+             FROM transaction_items ti
+             LEFT JOIN products p ON ti.item_id = p.id
+             WHERE ti.transaction_id = ANY($1::int[])`,
+            [txIds]
+        );
+
+        // Group items by transaction_id
+        const itemsByTx = {};
+        itemsResult.rows.forEach(row => {
+            if (!itemsByTx[row.transaction_id]) itemsByTx[row.transaction_id] = [];
+            itemsByTx[row.transaction_id].push(row);
+        });
+
+        // Attach items to each transaction
+        const merged = txResult.rows.map(tx => ({
+            ...tx,
+            items: itemsByTx[tx.id] || []
+        }));
+
+        sendJson(res, merged);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 
 app.get('/api/transactions/:id', authenticate, async (req, res) => {
     try {
