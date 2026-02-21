@@ -386,9 +386,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     const companyLines = doc.splitTextToSize(companyLine, 100);
     doc.text(companyLines, infoX, y + 13);
     const addrEndY = y + 13 + (companyLines.length - 1) * 3.5;
-    if (settings.npwp) {
-        doc.text(`NPWP: ${settings.npwp}`, infoX, addrEndY + 4);
-    }
+
 
     // Title "DELIVERY ORDER" – large, bold, right-aligned
     doc.setFont('helvetica', 'bold');
@@ -1370,7 +1368,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...C.DARK);
-    doc.text(currentUser?.username || 'Authorized', sigBoxX + sigBoxW / 2, sigLineY + 5, { align: 'center' });
+    doc.text('JOHAN ABIDIN', sigBoxX + sigBoxW / 2, sigLineY + 5, { align: 'center' });
 
     // --- LEFT: Payment text (constrained width, left of signature) ---
     if (hasBank || hasBank2) {

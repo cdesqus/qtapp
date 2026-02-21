@@ -1,4 +1,4 @@
-﻿class UI {
+class UI {
     constructor() {
         this.currentItemIndex = 0;
     }
@@ -572,18 +572,19 @@
                     </div>
                     <div class="table-container">
                         <table>
-                            <thead><tr><th>Username</th><th>Role</th><th>Signature</th><th>Actions</th></tr></thead>
+                            <thead><tr><th>Username</th><th>Full Name</th><th>Role</th><th>Signature</th><th>Actions</th></tr></thead>
                             <tbody>
-                                ${users.length === 0 ? '<tr><td colspan="4" style="text-align:center">No users found</td></tr>' :
+                                ${users.length === 0 ? '<tr><td colspan="5" style="text-align:center">No users found</td></tr>' :
                     users.map(u => `
                                     <tr>
                                         <td>${u.username}</td>
+                                        <td>${u.full_name || '<span style="color: var(--text-secondary); font-size: 0.8rem;">-</span>'}</td>
                                         <td><span style="padding: 4px 10px; border-radius: 4px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; background: ${u.role === 'admin' ? 'rgba(14,165,233,0.15)' : 'rgba(100,116,139,0.15)'}; color: ${u.role === 'admin' ? '#0ea5e9' : '#64748b'};">${u.role}</span></td>
                                         <td>
                                             ${u.signature ? `<img src="${u.signature}" style="max-height: 36px; max-width: 80px; object-fit: contain; border: 1px solid var(--border-color); border-radius: 4px; padding: 2px; background: white;">` : '<span style="color: var(--text-secondary); font-size: 0.8rem;">No signature</span>'}
                                         </td>
                                         <td style="display: flex; gap: 6px;">
-                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.editUserSignature('${u.id}')" title="Edit Signature"><i class="fa-solid fa-pen"></i></button>
+                                            <button class="btn btn-sm btn-secondary" onclick="window.ui.editUserSignature('${u.id}')" title="Edit User"><i class="fa-solid fa-pen"></i></button>
                                             <button class="btn btn-sm btn-error" onclick="window.ui.deleteUser('${u.id}', '${u.username}')" ${u.username === (window.store.currentUser?.username) ? 'disabled title="Cannot delete yourself"' : ''} title="Delete"><i class="fa-solid fa-trash"></i></button>
                                         </td>
                                     </tr>
@@ -602,7 +603,10 @@
         const content = `
             <h3>Add New User</h3>
             <form id="user-form">
-                <div class="form-group"><label>Username</label><input type="text" name="username" required placeholder="Enter username"></div>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div class="form-group"><label>Username</label><input type="text" name="username" required placeholder="Enter username"></div>
+                    <div class="form-group"><label>Full Name</label><input type="text" name="fullName" placeholder="Enter full name"></div>
+                </div>
                 <div class="form-group"><label>Password</label><input type="password" name="password" required placeholder="Enter password" minlength="4"></div>
                 <div class="form-group">
                     <label>Role</label>
@@ -641,6 +645,7 @@
                 username: formData.get('username'),
                 password: formData.get('password'),
                 role: formData.get('role'),
+                fullName: formData.get('fullName') || null,
                 signature: document.getElementById('sig-data').value || null
             };
             try {
@@ -655,8 +660,20 @@
         const user = (window.store.users || []).find(u => u.id === userId);
         if (!user) return;
         const content = `
-            <h3>Edit Signature â€” ${user.username}</h3>
+            <h3>Edit User â€” ${user.username}</h3>
             <div style="margin-top: 15px;">
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div class="form-group"><label>Username</label><input type="text" id="edit-username" value="${user.username}" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                    <div class="form-group"><label>Full Name</label><input type="text" id="edit-fullname" value="${user.full_name || ''}" placeholder="Enter full name" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px;"></div>
+                </div>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label>Role</label>
+                    <select id="edit-role" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px;">
+                        <option value="user" ${user.role === 'user' ? 'selected' : ''}>User</option>
+                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </div>
+                <label style="font-weight: 600; margin-bottom: 8px; display: block;">Signature</label>
                 <div id="edit-sig-preview" style="width: 200px; height: 100px; border: 2px dashed var(--border-color); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: white; margin-bottom: 15px;">
                     ${user.signature ? `<img src="${user.signature}" style="max-width: 100%; max-height: 100%; object-fit: contain;">` : '<span style="color: var(--text-secondary); font-size: 0.8rem;">No signature</span>'}
                 </div>
@@ -682,7 +699,12 @@
         if (!user) return;
         const sig = document.getElementById('edit-sig-data').value;
         try {
-            await window.store.updateUser(userId, { username: user.username, role: user.role, signature: sig || null });
+            await window.store.updateUser(userId, {
+                username: document.getElementById('edit-username').value || user.username,
+                role: document.getElementById('edit-role').value || user.role,
+                fullName: document.getElementById('edit-fullname').value || null,
+                signature: sig || null
+            });
             this.closeModal();
             this.renderUsers();
         } catch (err) { alert('Gagal menyimpan signature: ' + err.message); }
@@ -1022,11 +1044,10 @@
             } else if (isBAP) {
                 // BAST: Category | Product | Qty | SN | âœ•
                 itemsHeaderHtml = `
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
-                        <span style="${headerStyle}">Serial Number</span>
                         <span></span>
                     </div>`;
                 addRowFn = 'addBastItemRow';
@@ -1820,7 +1841,7 @@
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '100px 3fr 80px 2fr 40px';
+        row.style.gridTemplateColumns = '100px 3fr 80px 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -1843,7 +1864,6 @@
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle} text-align: center;">
-            <input type="text" name="items[${idx}][sn]" value="${item ? item.sn || '' : ''}" placeholder="Serial Number" style="${inputStyle}">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);
