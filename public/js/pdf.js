@@ -376,8 +376,8 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setFontSize(7.5);
     doc.setTextColor(...DO_COLORS.SECONDARY);
 
-    let companyLine = (settings.address || '').replace(/Tebet,\s*/i, 'Tebet,\n');
-    if (settings.phone) companyLine += `  \u2022  Phone: ${settings.phone}`;
+    let companyLine = (settings.address || '');
+    if (settings.phone) companyLine += `  \u2022  Telp: ${settings.phone}`;
     if (settings.email) companyLine += `  \u2022  ${settings.email}`;
     const companyLines = doc.splitTextToSize(companyLine, 100);
     doc.text(companyLines, infoX, y + 13);
@@ -1184,14 +1184,37 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     });
 
     const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT', 'UNIT PRICE', 'AMOUNT']];
-    const tableBody = resolvedItems.map((item, i) => [
-        String(i + 1),
-        item.resolvedName + (item.remarks ? '\n' + item.remarks : ''),
-        String(item.qty || 0),
-        item.unit || 'Pcs',
-        fmtCurrency(item.sellingPrice),
-        fmtCurrency(item.amount)
-    ]);
+
+    // Group items by category
+    const categoryOrder = [];
+    const categoryMap = {};
+    resolvedItems.forEach(item => {
+        const cat = (item.category || 'Lainnya').trim();
+        if (!categoryMap[cat]) { categoryMap[cat] = []; categoryOrder.push(cat); }
+        categoryMap[cat].push(item);
+    });
+
+    // Build body rows: insert a full-span category header before each group
+    const catDisplayName = { 'Barang': 'GOODS', 'Service': 'SERVICE' };
+    const tableBody = [];
+    const categoryRowIndices = new Set(); // track which row indices are category headers
+    let itemNo = 1;
+    categoryOrder.forEach(cat => {
+        // Category header row — put label in col 1, rest empty
+        const catLabel = catDisplayName[cat] || cat.toUpperCase();
+        categoryRowIndices.add(tableBody.length);
+        tableBody.push(['', catLabel, '', '', '', '']);
+        categoryMap[cat].forEach(item => {
+            tableBody.push([
+                String(itemNo++),
+                item.resolvedName + (item.remarks ? '\n' + item.remarks : ''),
+                String(item.qty || 0),
+                item.unit || 'Pcs',
+                fmtCurrency(item.sellingPrice),
+                fmtCurrency(item.amount)
+            ]);
+        });
+    });
 
     doc.autoTable({
         startY: y,
@@ -1216,7 +1239,21 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
             4: { cellWidth: 36, halign: 'right' },
             5: { cellWidth: 36, halign: 'right' }
         },
-        alternateRowStyles: { fillColor: C.LIGHT_BG }
+        alternateRowStyles: { fillColor: C.LIGHT_BG },
+        didParseCell: (data) => {
+            if (data.section === 'body' && categoryRowIndices.has(data.row.index)) {
+                // Style category header rows
+                data.cell.styles.fillColor = [0, 82, 155];
+                data.cell.styles.textColor = [255, 255, 255];
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fontSize = 7.5;
+                data.cell.styles.cellPadding = { top: 3, bottom: 3, left: 6, right: 4 };
+                if (data.column.index !== 1) {
+                    data.cell.styles.textColor = [0, 82, 155]; // hide empty cells
+                    data.cell.styles.fillColor = [0, 82, 155];
+                }
+            }
+        }
     });
 
     y = doc.lastAutoTable.finalY + 8;
