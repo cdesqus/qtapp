@@ -88,6 +88,16 @@
         document.getElementById('modal-container').classList.add('hidden');
     }
 
+    filterTable(tableId, query) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const q = query.toLowerCase().trim();
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = (!q || text.includes(q)) ? '' : 'none';
+        });
+    }
+
     renderClients() {
         try {
             const container = document.getElementById('content-area');
@@ -176,14 +186,22 @@
             const colCount = showPO ? 6 : 5;
             const label = this.typeLabel(type);
             const hideNewBtn = isDO || isBAP;
+            const tableId = `tx-table-${type}`;
             container.innerHTML = `
                 <div class="card">
                     <div class="card-header">
                         <h3>${label} List</h3>
-                        ${hideNewBtn ? '' : `<button class="btn btn-primary" onclick="window.ui.openTransactionForm('${type}')"><i class="fa-solid fa-plus"></i> New ${label}</button>`}
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="position:relative;">
+                                <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
+                                <input type="text" id="search-${type}" placeholder="Search..." oninput="window.ui.filterTable('${tableId}', this.value)"
+                                    style="padding:7px 10px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;">
+                            </div>
+                            ${hideNewBtn ? '' : `<button class="btn btn-primary" onclick="window.ui.openTransactionForm('${type}')"><i class="fa-solid fa-plus"></i> New ${label}</button>`}
+                        </div>
                     </div>
                     <div class="table-container">
-                        <table>
+                        <table id="${tableId}">
                             <thead>
                                 <tr><th>Date</th><th>Number</th>${showPO ? '<th>PO Number</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
                             </thead>
@@ -246,12 +264,10 @@
             };
 
             const rows = quos.map(q => {
-                const linkedDO = doList.find(d => cid(d) === cid(q) && po(d) === po(q))
-                    || doList.find(d => cid(d) === cid(q));
-                const linkedBAST = bastList.find(b => cid(b) === cid(q) && po(b) === po(q))
-                    || bastList.find(b => cid(b) === cid(q));
-                const linkedINV = invList.find(i => cid(i) === cid(q) && po(i) === po(q))
-                    || invList.find(i => cid(i) === cid(q));
+                // Match linked docs by PO number (exact) — no client-only fallback to avoid cross-linking
+                const linkedDO = doList.find(d => po(d) === po(q) && po(q) !== '');
+                const linkedBAST = bastList.find(b => po(b) === po(q) && po(q) !== '');
+                const linkedINV = invList.find(i => po(i) === po(q) && po(q) !== '');
                 const isPaid = linkedINV && (linkedINV.status || '').toLowerCase() === 'paid';
                 return { q, linkedDO, linkedBAST, linkedINV, isPaid };
             });
@@ -260,10 +276,17 @@
                 <div class="card">
                     <div class="card-header">
                         <h3><i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;color:var(--primary);"></i>Invoice Management</h3>
-                        <span style="font-size:0.85rem;color:var(--text-secondary);">${rows.length} Quotation dengan PO Confirmed</span>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="position:relative;">
+                                <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
+                                <input type="text" id="search-INV" placeholder="Search..." oninput="window.ui.filterTable('inv-table', this.value)"
+                                    style="padding:7px 10px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;">
+                            </div>
+                            <span style="font-size:0.85rem;color:var(--text-secondary);">${rows.length} Quotation dengan PO Confirmed</span>
+                        </div>
                     </div>
                     <div class="table-container">
-                        <table>
+                        <table id="inv-table">
                             <thead>
                                 <tr>
                                     <th>No. Quotation</th>
@@ -1638,14 +1661,22 @@
         let unitVal = 'Pcs';
         let priceVal = 0;
         let marginVal = 0;
+        let catVal = 'Barang';
         if (item) {
             const pid = item.itemId || item.item_id;
             productId = pid || '';
-            priceVal = item.price || 0;
-            marginVal = item.margin || 0;
             unitVal = item.unit || 'Pcs';
-            const found = window.store.products.find(p => p.id === pid);
-            if (found) productName = found.name;
+            catVal = item.category || 'Barang';
+            const found = pid ? (window.store.products || []).find(p => p.id === pid) : null;
+            if (found) {
+                productName = found.name;
+                // Use item's own price/margin if set, otherwise fall back to product defaults
+                priceVal = item.price || found.price || found.cost || 0;
+                marginVal = item.margin || found.margin || 15;
+            } else {
+                priceVal = item.price || 0;
+                marginVal = item.margin || 0;
+            }
         }
 
         const units = window.store.units || ['Pcs', 'Unit', 'Lot'];
@@ -1658,7 +1689,7 @@
 
         const inputStyle = 'width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.9rem;';
 
-        const catOptions = ['Barang', 'Service'].map(c => `<option value="${c}" ${(item?.category || 'Barang') === c ? 'selected' : ''}>${c}</option>`).join('');
+        const catOptions = ['Barang', 'Service'].map(c => `<option value="${c}" ${catVal === c ? 'selected' : ''}>${c}</option>`).join('');
 
         row.innerHTML = `
             <select name="items[${idx}][category]" style="${inputStyle}font-size:0.85rem;">${catOptions}</select>
