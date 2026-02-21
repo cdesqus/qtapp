@@ -288,6 +288,19 @@ class Store {
         await this.loadTransactions();
     }
 
+    async updateTransactionStatus(id, status) {
+        const res = await this.apiFetch(`${API_URL}/api/transactions/${id}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        if (res && !res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || 'Gagal mengupdate status.');
+        }
+        await this.loadTransactions();
+    }
+
     async deleteTransaction(id) {
         const res = await this.apiFetch(`${API_URL}/api/transactions/${id}`, { method: 'DELETE' });
         if (res && !res.ok) {

@@ -471,7 +471,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
         return { ...item, resolvedName: name, resolvedDesc: desc };
     });
 
-    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT', 'REMARKS']];
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT', 'SERIAL NUMBER', 'REMARKS']];
 
     const tableBody = resolvedItems.map((item, i) => {
         const qty = Number(item.qty) || 0;
@@ -481,6 +481,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
             descText,
             String(qty),
             item.unit || 'Pcs',
+            item.sn || item.serialNumber || item.serial_number || '',
             item.remarks || ''
         ];
     });
@@ -512,9 +513,10 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
         columnStyles: {
             0: { cellWidth: 14, halign: 'center' },
             1: { cellWidth: 'auto' },
-            2: { cellWidth: 22, halign: 'center' },
-            3: { cellWidth: 22, halign: 'center' },
-            4: { cellWidth: 50 }
+            2: { cellWidth: 18, halign: 'center' },
+            3: { cellWidth: 18, halign: 'center' },
+            4: { cellWidth: 38 },
+            5: { cellWidth: 38 }
         },
         alternateRowStyles: {
             fillColor: DO_COLORS.LIGHT_BG

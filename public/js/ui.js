@@ -319,7 +319,17 @@
                                             ${linkedINV ? `
                                             <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${linkedINV.id}')" title="Print Invoice">
                                                 <i class="fa-solid fa-print"></i>
-                                            </button>` : ''}
+                                            </button>
+                                            ${isPaid
+                                ? `<button class="btn btn-sm" style="background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);font-weight:600;"
+                                                    onclick="window.ui.setInvoiceStatus('${linkedINV.id}','Unpaid')" title="Tandai Unpaid">
+                                                    <i class="fa-solid fa-clock"></i> Unpaid
+                                                   </button>`
+                                : `<button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);font-weight:600;"
+                                                    onclick="window.ui.setInvoiceStatus('${linkedINV.id}','Paid')" title="Tandai Paid">
+                                                    <i class="fa-solid fa-circle-check"></i> Paid
+                                                   </button>`}
+                                            ` : ''}
                                         </td>
                                     </tr>
                                 `).join('')}
@@ -1078,6 +1088,13 @@
         }
     }
 
+    async setInvoiceStatus(invId, status) {
+        try {
+            await window.store.updateTransactionStatus(invId, status);
+            this.renderInvoiceManagement();
+        } catch (err) { alert('Gagal mengubah status: ' + err.message); }
+    }
+
     async printTransaction(id) {
         if (window.printPDF) {
             try {
@@ -1208,47 +1225,71 @@
                 const dueDateStr = dueDate.toISOString().substring(0, 10);
 
                 const allTx = window.store.transactions || [];
-                const clientDOs = allTx.filter(t => t.type === 'DO' && t.client_id === tx.clientId);
-                const clientBASTs = allTx.filter(t => t.type === 'BAP' && t.client_id === tx.clientId);
-                const doOptions = clientDOs.map(d => `<option value="${d.doc_number}">${d.doc_number}</option>`).join('');
-                const bastOptions = clientBASTs.map(d => `<option value="${d.doc_number}">${d.doc_number}</option>`).join('');
+                // Normalize helpers (backend uses snake_case)
+                const getClientId = t => t.clientId || t.client_id || '';
+                const getDocNum = t => t.docNumber || t.doc_number || '';
+                const getPO = t => t.customerPo || t.customer_po || '';
+
+                const clientDOs = allTx.filter(t => t.type === 'DO' && getClientId(t) === getClientId(tx));
+                const clientBASTs = allTx.filter(t => t.type === 'BAP' && getClientId(t) === getClientId(tx));
+
+                // Auto-detect by matching PO
+                const autoMatchDO = clientDOs.find(d => getPO(d) === getPO(tx)) || clientDOs[0];
+                const autoMatchBAST = clientBASTs.find(b => getPO(b) === getPO(tx)) || clientBASTs[0];
+
+                const doOptions = clientDOs.map(d => `<option value="${getDocNum(d)}"   ${autoMatchDO && getDocNum(d) === getDocNum(autoMatchDO) ? 'selected' : ''}>${getDocNum(d)}</option>`).join('');
+                const bastOptions = clientBASTs.map(b => `<option value="${getDocNum(b)}"   ${autoMatchBAST && getDocNum(b) === getDocNum(autoMatchBAST) ? 'selected' : ''}>${getDocNum(b)}</option>`).join('');
 
                 const hdrS = 'font-weight:600;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;';
-                const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 90px 140px 90px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
+                // Items header: NO Price, NO Margin
+                const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 80px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
                     <span style="${hdrS}">Category</span><span style="${hdrS}">Product</span><span style="${hdrS}">Qty</span>
-                    <span style="${hdrS}">Unit</span><span style="${hdrS}">Price</span><span style="${hdrS}">Margin %</span>
-                    <span style="${hdrS}">Remarks</span><span></span></div>`;
+                    <span style="${hdrS}">Unit</span><span style="${hdrS}">Remarks</span><span></span></div>`;
 
                 const content = `
                     <h3>New Invoice (from Quotation)</h3>
                     <form id="transaction-form">
                         <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;">
-                            <div class="form-group"><label>Invoice Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required readonly style="background:#f1f5f9;cursor:not-allowed;"></div>
+                            <div class="form-group"><label>Invoice Number</label><input type="text" name="docNumber" value="${window.store.generateNextDocNumber('INV')}" required readonly style="background:#f1f5f9;cursor:not-allowed;"></div>
                             <div class="form-group"><label>Invoice Date</label><input type="date" name="date" id="inv-date" value="${invoiceDate}" required></div>
                             <div class="form-group"><label>Client</label>
                                 <select name="clientId" required>
                                     <option value="">Select Client</option>
-                                    ${window.store.clients.map(c => `<option value="${c.id}" ${tx.clientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                    ${window.store.clients.map(c => `<option value="${c.id}" ${getClientId(tx) === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
                         <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px;">
                             <div class="form-group"><label>Due Date</label><input type="date" name="dueDate" id="inv-due-date" value="${dueDateStr}" required></div>
                             <div class="form-group"><label>U.P. / Attention (Opsional)</label><input type="text" name="attention" placeholder="Nama PIC klien"></div>
-                            <div class="form-group"><label>PO Reference</label><input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Nomor PO"></div>
+                            <div class="form-group"><label>PO Reference</label><input type="text" name="customerPo" value="${getPO(tx)}" placeholder="Nomor PO"></div>
                         </div>
                         <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
-                            <div class="form-group"><label>Referensi DO</label>
-                                <select name="doRef"><option value="">-- Pilih DO (opsional) --</option>${doOptions}</select>
+                            <div class="form-group">
+                                <label>Referensi DO</label>
+                                ${doOptions
+                        ? `<select name="doRef"><option value="">-- Pilih DO --</option>${doOptions}</select>
+                                       ${autoMatchDO ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(59,130,246,0.08);border-radius:6px;font-size:0.82rem;color:#3b82f6;border:1px solid rgba(59,130,246,0.2);">
+                                           <i class="fa-solid fa-truck"></i> <strong>${getDocNum(autoMatchDO)}</strong> — terdeteksi otomatis</div>` : ''}`
+                        : `<div style="padding:10px;background:rgba(100,116,139,0.08);border-radius:6px;font-size:0.83rem;color:var(--text-secondary);border:1px solid var(--border-color);">
+                                           <i class="fa-solid fa-info-circle"></i> Belum ada DO untuk klien ini
+                                           <input type="hidden" name="doRef" value=""></div>`}
                             </div>
-                            <div class="form-group"><label>Referensi BAST</label>
-                                <select name="bastRef"><option value="">-- Pilih BAST (opsional) --</option>${bastOptions}</select>
+                            <div class="form-group">
+                                <label>Referensi BAST</label>
+                                ${bastOptions
+                        ? `<select name="bastRef"><option value="">-- Pilih BAST --</option>${bastOptions}</select>
+                                       ${autoMatchBAST ? `<div style="margin-top:6px;padding:6px 10px;background:rgba(168,85,247,0.08);border-radius:6px;font-size:0.82rem;color:#a855f7;border:1px solid rgba(168,85,247,0.2);">
+                                           <i class="fa-solid fa-file-signature"></i> <strong>${getDocNum(autoMatchBAST)}</strong> — terdeteksi otomatis</div>` : ''}`
+                        : `<div style="padding:10px;background:rgba(100,116,139,0.08);border-radius:6px;font-size:0.83rem;color:var(--text-secondary);border:1px solid var(--border-color);">
+                                           <i class="fa-solid fa-info-circle"></i> Belum ada BAST untuk klien ini
+                                           <input type="hidden" name="bastRef" value=""></div>`}
                             </div>
                         </div>
                         <h4 style="margin-top:20px;margin-bottom:10px;">Items</h4>
                         ${itemsHeader}
                         <div id="tx-items-container"></div>
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top:10px;">+ Add Item</button>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addInvItemRow()" style="margin-top:10px;">+ Add Item</button>
                         <div style="margin-top:20px;">
                             <button type="submit" class="btn btn-primary">Save Invoice</button>
                             <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
@@ -1263,8 +1304,8 @@
                 });
 
                 this.currentItemIndex = 0;
-                if (tx.items && tx.items.length > 0) tx.items.forEach(item => this.addTxItemRow(item));
-                else this.addTxItemRow();
+                if (tx.items && tx.items.length > 0) tx.items.forEach(item => this.addInvItemRow(item));
+                else this.addInvItemRow();
 
                 document.getElementById('transaction-form').onsubmit = async (e) => {
                     e.preventDefault();
@@ -1275,23 +1316,24 @@
                         items.push({
                             itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
                             qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
-                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
-                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 0,
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
                             category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
-                            unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
+                            unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
+                            // Price carried from source quotation item
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
                         });
                     });
                     const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '' };
                     const data = {
                         type: 'INV', docNumber: fd.get('docNumber'), customerPo: fd.get('customerPo') || '',
-                        date: fd.get('date'), clientId: fd.get('clientId'), status: 'Draft', terms: '',
+                        date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
                         invoiceNotes: JSON.stringify(invMeta), items
                     };
                     try {
                         await window.store.addTransaction(data, items);
                         this.closeModal();
-                        this.renderTransactions('INV');
+                        this.renderInvoiceManagement();
                     } catch (err) { alert('Gagal menyimpan Invoice: ' + err.message); }
                 };
                 return; // INV handled
@@ -1554,6 +1596,64 @@
             if (dropdown && !row.contains(e.target)) {
                 dropdown.style.display = 'none';
             }
+        });
+    }
+
+    // ── Invoice item row: Category | Product | Qty | Unit | Remarks (no Price/Margin) ──
+    addInvItemRow(item = null) {
+        const container = document.getElementById('tx-items-container');
+        if (!container) return;
+        const idx = this.currentItemIndex++;
+
+        let productName = '';
+        let productId = '';
+        let unitVal = 'Pcs';
+        let priceVal = 0;
+        let marginVal = 0;
+        if (item) {
+            const pid = item.itemId || item.item_id;
+            productId = pid || '';
+            priceVal = item.price || 0;
+            marginVal = item.margin || 0;
+            unitVal = item.unit || 'Pcs';
+            const found = window.store.products.find(p => p.id === pid);
+            if (found) productName = found.name;
+        }
+
+        const units = window.store.units || ['Pcs', 'Unit', 'Lot'];
+        const unitOptions = units.map(u => `<option value="${u}" ${unitVal === u ? 'selected' : ''}>${u}</option>`).join('');
+
+        const row = document.createElement('div');
+        row.className = 'tx-item-row';
+        row.style.cssText = 'display:grid;grid-template-columns:120px 3fr 80px 80px 2fr 40px;gap:10px;margin-bottom:8px;align-items:center;';
+        row.dataset.index = idx;
+
+        const inputStyle = 'width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.9rem;';
+
+        const catOptions = ['Barang', 'Service'].map(c => `<option value="${c}" ${(item?.category || 'Barang') === c ? 'selected' : ''}>${c}</option>`).join('');
+
+        row.innerHTML = `
+            <select name="items[${idx}][category]" style="${inputStyle}font-size:0.85rem;">${catOptions}</select>
+            <div style="position:relative;">
+                <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
+                    oninput="window.ui.onProductSearch(this,${idx})"
+                    onfocus="window.ui.onProductSearch(this,${idx})"
+                    style="${inputStyle}">
+                <input type="hidden" name="items[${idx}][itemId]"  value="${productId}">
+                <input type="hidden" name="items[${idx}][price]"   value="${priceVal}">
+                <input type="hidden" name="items[${idx}][margin]"  value="${marginVal}">
+                <div id="product-dropdown-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+            </div>
+            <input type="number" name="items[${idx}][qty]"     value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle}text-align:center;">
+            <select name="items[${idx}][unit]" style="${inputStyle}font-size:0.85rem;">${unitOptions}</select>
+            <input type="text"   name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
+            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding:6px 10px;font-size:1rem;">&times;</button>
+        `;
+        container.appendChild(row);
+
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById(`product-dropdown-${idx}`);
+            if (dropdown && !row.contains(e.target)) dropdown.style.display = 'none';
         });
     }
 }
