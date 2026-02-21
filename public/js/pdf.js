@@ -360,12 +360,12 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     let y = 18;
 
     // ── HEADER: Logo + Company Info (left) | DELIVERY ORDER title (right) ──
-    const logoH = 22;
+    const logoH = 15;
     if (settings.logo) {
-        try { doc.addImage(settings.logo, 'AUTO', marginL, y, 22, logoH); } catch (e) { }
+        try { doc.addImage(settings.logo, 'AUTO', marginL, y, 15, logoH); } catch (e) { }
     }
 
-    const infoX = settings.logo ? marginL + 28 : marginL;
+    const infoX = settings.logo ? marginL + 20 : marginL;
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
@@ -381,6 +381,10 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     if (settings.email) companyLine += `  \u2022  ${settings.email}`;
     const companyLines = doc.splitTextToSize(companyLine, 100);
     doc.text(companyLines, infoX, y + 13);
+    const addrEndY = y + 13 + (companyLines.length - 1) * 3.5;
+    if (settings.npwp) {
+        doc.text(`NPWP: ${settings.npwp}`, infoX, addrEndY + 4);
+    }
 
     // Title "DELIVERY ORDER" – large, bold, right-aligned
     doc.setFont('helvetica', 'bold');
@@ -389,7 +393,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.text('DELIVERY ORDER', pageW - marginR, y + 8, { align: 'right' });
 
 
-    y += Math.max(logoH, 22) + 8;
+    y += Math.max(logoH, 22) + 6;
 
     // ── Accent line ──
     doc.setDrawColor(...DO_COLORS.PRIMARY);
@@ -496,7 +500,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
         styles: {
             font: 'helvetica',
             fontSize: 9,
-            cellPadding: { top: 5, bottom: 5, left: 5, right: 5 },
+            cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
             textColor: DO_COLORS.DARK,
             lineColor: DO_COLORS.BORDER,
             lineWidth: 0.1,
@@ -511,7 +515,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
             halign: 'center'
         },
         columnStyles: {
-            0: { cellWidth: 14, halign: 'center' },
+            0: { cellWidth: 16, halign: 'center' },
             1: { cellWidth: 'auto' },
             2: { cellWidth: 18, halign: 'center' },
             3: { cellWidth: 18, halign: 'center' },
@@ -584,7 +588,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.text('PENGIRIM / SENDER', sigLeftX, y, { align: 'center' });
     doc.text('PENERIMA / RECEIVER', sigRightX, y, { align: 'center' });
 
-    y += 30;
+    y += 22;
 
     // Signature lines
     doc.setDrawColor(...DO_COLORS.BORDER);
@@ -1055,19 +1059,20 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     }
 
     // ── HEADER: Logo + Company Name (left) | "INVOICE" (right) ───
-    const logoSz = 14;  // small square logo next to company name
+    // Logo height matched to cap-height of 12pt bold (~8mm)
+    const logoSz = 8;
 
-    // Logo — left, next to company name
+    // Logo — left, vertically centered with company name
     if (settings.logo) {
         try { doc.addImage(settings.logo, 'AUTO', mL, y, logoSz, logoSz); } catch (e) { }
     }
-    const nameX = settings.logo ? mL + logoSz + 4 : mL;
+    const nameX = settings.logo ? mL + logoSz + 3 : mL;
 
     // Company name beside logo
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(12);
     doc.setTextColor(...C.PRIMARY);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', nameX, y + 5);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', nameX, y + 6);
 
     // "INVOICE" title — right side, large
     doc.setFont('helvetica', 'bold');
@@ -1075,25 +1080,25 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...C.PRIMARY);
     doc.text('INVOICE', pageW - mR, y + 10, { align: 'right' });
 
-    // Address & phone below company name
+    // Address & phone below company name (aligned to nameX)
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...C.SECONDARY);
     const rawAddr = (settings.address || '').split('\n').map(l => l.trim()).filter(Boolean);
     if (settings.phone) rawAddr.push(`Telp: ${settings.phone}`);
-    let addrY = y + logoSz + 2;
     const addrMaxW = (pageW - mL - mR) / 2 - 4;
+    let addrY = y + 11;  // start just below company name text
     rawAddr.forEach(line => {
         const wrapped = doc.splitTextToSize(line, addrMaxW);
-        doc.text(wrapped, mL, addrY);
+        doc.text(wrapped, nameX, addrY);
         addrY += wrapped.length * 3.4;
     });
     if (settings.npwp) {
-        doc.text(`NPWP: ${settings.npwp}`, mL, addrY);
+        doc.text(`NPWP: ${settings.npwp}`, nameX, addrY);
         addrY += 3.4;
     }
 
-    y = addrY + 4;
+    y = Math.max(addrY, y + 16) + 4;
 
     // ── Accent separator line ────────────────────────────────────
     doc.setDrawColor(...C.PRIMARY);
@@ -1204,7 +1209,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
             fillColor: C.PRIMARY, textColor: C.WHITE, fontStyle: 'bold', fontSize: 8, halign: 'center', lineWidth: 0
         },
         columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
+            0: { cellWidth: 14, halign: 'center' },
             1: { cellWidth: 'auto' },
             2: { cellWidth: 16, halign: 'center' },
             3: { cellWidth: 18, halign: 'center' },
@@ -1371,8 +1376,8 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...C.DARK);
     doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigBoxX + sigBoxW / 2, sigStartY + 5, { align: 'center' });
 
-    // Empty signature space — cukup untuk materai (~40mm)
-    const sigLineY = sigStartY + 52;
+    // Empty signature space — cukup untuk materai (~35mm)
+    const sigLineY = sigStartY + 43;
     doc.setDrawColor(...C.BORDER);
     doc.setLineWidth(0.4);
     doc.line(sigBoxX + 6, sigLineY, sigBoxX + sigBoxW - 6, sigLineY);
