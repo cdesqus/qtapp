@@ -389,13 +389,31 @@
                 return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
             };
 
+            // ── Price helpers ──────────────────────────────────────────
+            const fmtIDR = v => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
+
+            const calcSelling = (tx) => (tx.items || []).reduce((s, item) => {
+                const price = Number(item.price || item.cost || 0);
+                const margin = Number(item.margin || 0);
+                const qty = Number(item.qty || 0);
+                return s + price * (1 + margin / 100) * qty;
+            }, 0);
+
+            const calcCost = (tx) => (tx.items || []).reduce((s, item) => {
+                const cost = Number(item.price || item.cost || 0);
+                const qty = Number(item.qty || 0);
+                return s + cost * qty;
+            }, 0);
+
             const rows = quos.map(q => {
                 // Match linked docs by PO number (exact) — no client-only fallback to avoid cross-linking
                 const linkedDO = doList.find(d => po(d) === po(q) && po(q) !== '');
                 const linkedBAST = bastList.find(b => po(b) === po(q) && po(q) !== '');
                 const linkedINV = invList.find(i => po(i) === po(q) && po(q) !== '');
                 const isPaid = linkedINV && (linkedINV.status || '').toLowerCase() === 'paid';
-                return { q, linkedDO, linkedBAST, linkedINV, isPaid };
+                const selling = calcSelling(q);
+                const cost = calcCost(q);
+                return { q, linkedDO, linkedBAST, linkedINV, isPaid, selling, cost };
             });
 
             container.innerHTML = `
@@ -422,14 +440,17 @@
                                     <th>Tanggal DO</th>
                                     <th>No. BAST</th>
                                     <th>Tanggal BAST</th>
+                                    <th>No. Invoice</th>
+                                    <th style="text-align:right;">Harga Jual</th>
+                                    <th style="text-align:right;">Cost</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 ${rows.length === 0
-                    ? '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-secondary);">Belum ada Quotation dengan PO Confirmed.</td></tr>'
-                    : rows.map(({ q, linkedDO, linkedBAST, linkedINV, isPaid }) => `
+                    ? '<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-secondary);">Belum ada Quotation dengan PO Confirmed.</td></tr>'
+                    : rows.map(({ q, linkedDO, linkedBAST, linkedINV, isPaid, selling, cost }) => `
                                     <tr>
                                         <td>
                                             <span style="font-weight:600;color:var(--primary);">${q.docNumber || q.doc_number || '-'}</span><br>
@@ -445,6 +466,22 @@
                                         <td style="font-size:0.85rem;">${linkedDO ? fmt(linkedDO.date) : '-'}</td>
                                         <td>${linkedBAST ? `<span style="font-weight:600;">${linkedBAST.docNumber || linkedBAST.doc_number || '-'}</span>` : '<span style="color:var(--text-secondary);">-</span>'}</td>
                                         <td style="font-size:0.85rem;">${linkedBAST ? fmt(linkedBAST.date) : '-'}</td>
+                                        <!-- No. Invoice -->
+                                        <td>
+                                            ${linkedINV
+                            ? `<span style="font-weight:600;color:var(--primary);">${linkedINV.docNumber || linkedINV.doc_number || '-'}</span><br>
+                                                   <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(linkedINV.date)}</span>`
+                            : '<span style="color:var(--text-secondary);font-size:0.82rem;">Belum dibuat</span>'}
+                                        </td>
+                                        <!-- Harga Jual (before tax) -->
+                                        <td style="text-align:right;font-weight:600;color:var(--text-primary);font-size:0.85rem;white-space:nowrap;">
+                                            ${selling > 0 ? fmtIDR(selling) : '<span style="color:var(--text-secondary);">-</span>'}
+                                        </td>
+                                        <!-- Cost Price -->
+                                        <td style="text-align:right;font-size:0.82rem;color:var(--text-secondary);white-space:nowrap;">
+                                            ${cost > 0 ? fmtIDR(cost) : '<span>-</span>'}
+                                        </td>
+                                        <!-- Status -->
                                         <td>
                                             ${linkedINV
                             ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;${isPaid
