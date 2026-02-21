@@ -45,7 +45,7 @@ const printPDF = async (id) => {
     } else if (tx.type === 'BAP') {
         generateBASTPDF(jsPDF, tx, settings, client);
     } else if (tx.type === 'INV') {
-        generateInvoicePDF(jsPDF, tx, settings, client);
+        await generateInvoicePDF(jsPDF, tx, settings, client);
     } else {
         const doc = new jsPDF();
         doc.setFont('helvetica', 'bold');
@@ -961,163 +961,457 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
 
 
 // ═══════════════════════════════════════════════════════════
-//  INVOICE PDF  (existing logic preserved & enhanced)
+//  INVOICE PDF  — Professional Corporate Layout
 // ═══════════════════════════════════════════════════════════
-function generateInvoicePDF(jsPDF, tx, settings, client) {
+
+// Helper: Indonesian number to words
+function terbilangID(n) {
+    const satuan = ['', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan',
+        'sepuluh', 'sebelas', 'dua belas', 'tiga belas', 'empat belas', 'lima belas',
+        'enam belas', 'tujuh belas', 'delapan belas', 'sembilan belas'];
+    function ratusan(x) {
+        if (x === 0) return '';
+        if (x < 20) return satuan[x];
+        if (x < 100) return satuan[Math.floor(x / 10)] + ' puluh' + (x % 10 ? ' ' + satuan[x % 10] : '');
+        const h = Math.floor(x / 100), r = x % 100;
+        return (h === 1 ? 'seratus' : satuan[h] + ' ratus') + (r ? ' ' + ratusan(r) : '');
+    }
+    n = Math.round(n);
+    if (n === 0) return 'Nol Rupiah';
+    let res = '';
+    const m = Math.floor(n / 1000000000);
+    const jt = Math.floor((n % 1000000000) / 1000000);
+    const rb = Math.floor((n % 1000000) / 1000);
+    const st = n % 1000;
+    if (m) res += ratusan(m) + ' miliar ';
+    if (jt) res += ratusan(jt) + ' juta ';
+    if (rb) res += (rb === 1 ? 'seribu' : ratusan(rb) + ' ribu') + ' ';
+    if (st) res += ratusan(st);
+    res = res.trim();
+    return res.charAt(0).toUpperCase() + res.slice(1) + ' Rupiah';
+}
+
+// Helper: generate QR code as PNG data URL
+async function genQRDataURL(text) {
+    try {
+        if (typeof QRCode === 'undefined') return null;
+        const canvas = document.createElement('canvas');
+        await QRCode.toCanvas(canvas, text, { width: 130, margin: 1, color: { dark: '#00529b', light: '#ffffff' } });
+        return canvas.toDataURL('image/png');
+    } catch (e) { return null; }
+}
+
+async function generateInvoicePDF(jsPDF, tx, settings, client) {
+    const C = {
+        PRIMARY: [0, 82, 155],
+        PRIMARY_D: [0, 55, 110],
+        DARK: [30, 41, 59],
+        SECONDARY: [100, 116, 139],
+        LIGHT_BG: [248, 250, 252],
+        WHITE: [255, 255, 255],
+        BORDER: [226, 232, 240],
+        GREEN: [22, 163, 74],
+        GREEN_LT: [220, 252, 231],
+        AMBER: [180, 83, 9],
+    };
+
+    // Parse invoice metadata
+    let meta = {};
+    try { meta = JSON.parse(tx.invoiceNotes || tx.invoice_notes || '{}'); } catch (e) { }
+    const dueDate = meta.dueDate || '';
+    const attention = meta.attention || '';
+    const doRef = meta.doRef || '';
+    const bastRef = meta.bastRef || '';
+    const isPaid = (tx.status || '').toLowerCase() === 'paid';
+
+    // Build QR content from bank info
+    const bankQrText = [
+        settings.bankName ? `Bank: ${settings.bankName}` : '',
+        settings.bankAccount ? `No Rek: ${settings.bankAccount}` : '',
+        settings.bankHolder ? `A.N: ${settings.bankHolder}` : '',
+        `Invoice: ${tx.docNumber || ''}`,
+    ].filter(Boolean).join('\n');
+
+    const qrDataUrl = await genQRDataURL(bankQrText || tx.docNumber || 'IDE ERP');
+
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
-    const marginL = 18;
-    const marginR = 18;
+    const pageH = doc.internal.pageSize.getHeight();
+    const mL = 18, mR = 18;
+    const W = pageW - mL - mR;
     let y = 18;
 
-    // Header
-    if (settings.logo) {
-        try { doc.addImage(settings.logo, 'AUTO', marginL, y, 22, 22); } catch (e) { }
+    // ── LUNAS WATERMARK (if paid) ──────────────────────────────────
+    if (isPaid) {
+        doc.saveGraphicsState();
+        doc.setGState(new doc.GState({ opacity: 0.12 }));
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(88);
+        doc.setTextColor(...C.GREEN);
+        doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+        doc.restoreGraphicsState();
     }
 
-    const infoX = settings.logo ? marginL + 28 : marginL;
+    // ── HEADER: Company Info (left) | Logo (right) | "INVOICE" ────
+    const logoH = 24;
+    // Logo — top right
+    if (settings.logo) {
+        try { doc.addImage(settings.logo, 'AUTO', pageW - mR - 30, y, 30, logoH); } catch (e) { }
+    }
+
+    // Company info — left
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(13);
-    doc.setTextColor(...PDF_COLORS.PRIMARY);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', infoX, y + 7);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', mL, y + 7);
 
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(8);
-    doc.setTextColor(...PDF_COLORS.SECONDARY);
-    doc.text(settings.address || '', infoX, y + 13, { maxWidth: 80 });
+    doc.setFontSize(7.8);
+    doc.setTextColor(...C.SECONDARY);
+    let compLine = (settings.address || '').replace(/\n/g, '  ·  ');
+    if (settings.phone) compLine += `  ·  Telp: ${settings.phone}`;
+    const compLines = doc.splitTextToSize(compLine, 110);
+    doc.text(compLines, mL, y + 13);
+    if (settings.npwp) {
+        doc.text(`NPWP: ${settings.npwp}`, mL, y + 13 + compLines.length * 3.5);
+    }
 
+    // "INVOICE" title bold centered-right
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(26);
-    doc.setTextColor(...PDF_COLORS.PRIMARY);
-    doc.text('INVOICE', pageW - marginR, y + 10, { align: 'right' });
+    doc.setFontSize(30);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('INVOICE', pageW - mR - 32, y + logoH + 8, { align: 'right' });
 
-    y += 32;
+    y += Math.max(logoH, 22) + 12;
 
-    doc.setDrawColor(...PDF_COLORS.PRIMARY);
-    doc.setLineWidth(0.8);
-    doc.line(marginL, y, pageW - marginR, y);
+    // ── Accent separator line ────────────────────────────────────
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(1.0);
+    doc.line(mL, y, pageW - mR, y);
+    doc.setLineWidth(0.25);
+    doc.setDrawColor(...C.BORDER);
+    doc.line(mL, y + 1.5, pageW - mR, y + 1.5);
     y += 10;
 
-    // Info
-    doc.setFontSize(9);
-    doc.setTextColor(...PDF_COLORS.DARK);
+    // ── BILL FROM (left) | DOC INFO (right) ───────────────────────
+    const colMid = pageW / 2 - 5;
+    const startInfoY = y;
+
+    // LEFT — BILL TO
     doc.setFont('helvetica', 'bold');
-    doc.text('Invoice No:', marginL, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(tx.docNumber || '-', marginL + 25, y);
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('BILL TO', mL, y);
+    y += 5;
 
     doc.setFont('helvetica', 'bold');
-    doc.text('Date:', 120, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(fmtDate(tx.date), 135, y);
-    y += 6;
+    doc.setFontSize(10.5);
+    doc.setTextColor(...C.DARK);
+    doc.text(client?.name || tx.clientName || '-', mL, y);
+    y += 5;
 
-    if (client) {
-        doc.setFont('helvetica', 'bold');
-        doc.text('Bill To:', marginL, y);
-        doc.setFont('helvetica', 'normal');
-        doc.text(client.name, marginL + 25, y);
-        y += 4;
-        if (client.address) {
-            doc.setFontSize(8);
-            doc.setTextColor(...PDF_COLORS.SECONDARY);
-            doc.text(client.address, marginL + 25, y, { maxWidth: 100 });
-            y += 6;
-        }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.SECONDARY);
+    if (client?.address) {
+        const addrLines = doc.splitTextToSize(client.address, colMid - mL - 6);
+        doc.text(addrLines, mL, y);
+        y += addrLines.length * 3.8;
     }
-    y += 6;
+    if (attention) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.DARK);
+        doc.text(`u.p. ${attention}`, mL, y);
+        y += 4.5;
+    }
 
-    // Table
+    // RIGHT — Doc Info
+    const rLX = colMid + 8;
+    const rRX = pageW - mR;
+    let ry = startInfoY;
+
+    const drawDocRow = (label, value, bold = false, hilight = false) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.SECONDARY);
+        doc.text(label, rLX, ry);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(bold ? 10 : 8.5);
+        doc.setTextColor(hilight ? C.PRIMARY[0] : C.DARK[0], hilight ? C.PRIMARY[1] : C.DARK[1], hilight ? C.PRIMARY[2] : C.DARK[2]);
+        doc.text(value, rRX, ry, { align: 'right' });
+        ry += bold ? 7 : 5.5;
+    };
+
+    drawDocRow('Invoice No.', tx.docNumber || '-', true, true);
+    drawDocRow('Invoice Date', fmtDate(tx.date));
+    if (dueDate) drawDocRow('Due Date', fmtDate(dueDate));
+    if (tx.customerPo || tx.customer_po) drawDocRow('PO Reference', tx.customerPo || tx.customer_po);
+
+    y = Math.max(y + 6, ry + 4);
+
+    // ── REFERENCES BOX (DO & BAST) ───────────────────────────────
+    if (doRef || bastRef) {
+        doc.setFillColor(...C.LIGHT_BG);
+        doc.setDrawColor(...C.BORDER);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(mL, y, W, 12, 2, 2, 'FD');
+        doc.setFillColor(...C.PRIMARY);
+        doc.roundedRect(mL, y, 3, 12, 1, 1, 'F');
+
+        let refText = '';
+        if (doRef) refText += `DO Ref: ${doRef}`;
+        if (doRef && bastRef) refText += '   |   ';
+        if (bastRef) refText += `BAST Ref: ${bastRef}`;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.PRIMARY);
+        doc.text('References:', mL + 7, y + 5);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(...C.DARK);
+        doc.text(refText, mL + 34, y + 5);
+        y += 18;
+    }
+
+    // ── ITEMS TABLE ───────────────────────────────────────────────
     const items = tx.items || [];
     const resolvedItems = items.map(item => {
         let name = item.itemName || item.item_name || '';
+        let desc = item.itemDescription || item.item_description || '';
         if (!name && item.itemId) {
             const prod = window.store.products.find(p => p.id === item.itemId);
-            if (prod) name = prod.name;
+            if (prod) { name = prod.name; desc = prod.description || ''; }
         }
-        return { ...item, resolvedName: name };
+        const basePrice = Number(item.price) || 0;
+        const margin = Number(item.margin) || 0;
+        const sellingPrice = basePrice * (1 + margin / 100);
+        const qty = Number(item.qty) || 0;
+        const amount = sellingPrice * qty;
+        return { ...item, resolvedName: name, resolvedDesc: desc, sellingPrice, amount };
     });
 
-    const headers = [['No.', 'Description', 'Qty', 'Unit Price', 'Total']];
-    const body = resolvedItems.map((item, i) => {
-        const price = Number(item.price) || 0;
-        const margin = Number(item.margin) || 0;
-        const sellingPrice = price * (1 + margin / 100);
-        const total = sellingPrice * (Number(item.qty) || 0);
-        return [
-            String(i + 1),
-            item.resolvedName || '-',
-            String(item.qty),
-            fmtCurrency(sellingPrice),
-            fmtCurrency(total)
-        ];
-    });
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT', 'UNIT PRICE', 'AMOUNT']];
+    const tableBody = resolvedItems.map((item, i) => [
+        String(i + 1),
+        item.resolvedName + (item.remarks ? '\n' + item.remarks : ''),
+        String(item.qty || 0),
+        item.unit || 'Pcs',
+        fmtCurrency(item.sellingPrice),
+        fmtCurrency(item.amount)
+    ]);
 
     doc.autoTable({
         startY: y,
-        head: headers,
-        body: body,
+        head: tableHeaders,
+        body: tableBody,
         theme: 'plain',
-        margin: { left: marginL, right: marginR },
+        margin: { left: mL, right: mR },
+        tableWidth: W,
         styles: {
-            fontSize: 8.5,
+            font: 'helvetica', fontSize: 8.5,
             cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
-            textColor: PDF_COLORS.DARK,
-            lineColor: PDF_COLORS.BORDER,
-            lineWidth: 0.2
+            textColor: C.DARK, lineColor: C.BORDER, lineWidth: 0.1, valign: 'middle'
         },
         headStyles: {
-            fillColor: PDF_COLORS.PRIMARY,
-            textColor: PDF_COLORS.WHITE,
-            fontStyle: 'bold',
-            fontSize: 8,
-            halign: 'center'
+            fillColor: C.PRIMARY, textColor: C.WHITE, fontStyle: 'bold', fontSize: 8, halign: 'center', lineWidth: 0
         },
         columnStyles: {
-            0: { cellWidth: 12, halign: 'center' },
+            0: { cellWidth: 10, halign: 'center' },
             1: { cellWidth: 'auto' },
-            2: { cellWidth: 20, halign: 'center' },
-            3: { cellWidth: 35, halign: 'right' },
-            4: { cellWidth: 38, halign: 'right' }
+            2: { cellWidth: 16, halign: 'center' },
+            3: { cellWidth: 18, halign: 'center' },
+            4: { cellWidth: 36, halign: 'right' },
+            5: { cellWidth: 36, halign: 'right' }
         },
-        alternateRowStyles: { fillColor: PDF_COLORS.LIGHT_BG }
+        alternateRowStyles: { fillColor: C.LIGHT_BG }
     });
 
     y = doc.lastAutoTable.finalY + 8;
 
-    // Totals
+    // ── TAX SUMMARY ───────────────────────────────────────────────
     let subtotal = 0;
+    let serviceAmt = 0;
+
     resolvedItems.forEach(item => {
-        const price = Number(item.price) || 0;
-        const margin = Number(item.margin) || 0;
-        const sellingPrice = price * (1 + margin / 100);
-        subtotal += sellingPrice * (Number(item.qty) || 0);
+        subtotal += item.amount;
+        if ((item.category || '').toLowerCase().includes('service') || (item.category || '').toLowerCase().includes('service')) {
+            serviceAmt += item.amount;
+        }
     });
 
-    const totX = pageW - marginR - 75;
-    const totVX = pageW - marginR;
+    // Correct formula: DPP = Subtotal * 11/12, PPN = DPP * 12%, PPH23 = serviceAmt * 2%
+    const dpp = subtotal * 11 / 12;
+    const ppn = dpp * 0.12;
+    const pph23 = serviceAmt * 0.02;
+    const grandTotal = subtotal + ppn + pph23;   // per user spec: Subtotal + PPN + PPH23
 
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    doc.setTextColor(...PDF_COLORS.SECONDARY);
-    doc.text('Subtotal', totX, y);
-    doc.text(fmtCurrency(subtotal), totVX, y, { align: 'right' });
-    y += 6;
+    const totX = pageW - mR - 82;
+    const totVX = pageW - mR;
+    const lineH = 6;
 
-    const ppn = subtotal * 0.11;
-    doc.text('PPN (11%)', totX, y);
-    doc.text(fmtCurrency(ppn), totVX, y, { align: 'right' });
-    y += 7;
+    const drawTaxRow = (label, value, bold = false, highlight = false) => {
+        if (highlight) {
+            doc.setFillColor(...C.PRIMARY);
+            doc.roundedRect(totX - 4, y - 4.5, 86, 9, 1.5, 1.5, 'F');
+        }
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(bold ? 9.5 : 8.5);
+        doc.setTextColor(highlight ? 255 : (bold ? C.DARK[0] : C.SECONDARY[0]),
+            highlight ? 255 : (bold ? C.DARK[1] : C.SECONDARY[1]),
+            highlight ? 255 : (bold ? C.DARK[2] : C.SECONDARY[2]));
+        doc.text(label, totX, y);
+        doc.text(value, totVX, y, { align: 'right' });
+        y += lineH;
+    };
 
-    doc.setFillColor(...PDF_COLORS.PRIMARY);
-    doc.roundedRect(totX - 4, y - 4, 79, 8, 1, 1, 'F');
+    const drawTaxDivider = () => {
+        doc.setDrawColor(...C.BORDER);
+        doc.setLineWidth(0.3);
+        doc.line(totX - 4, y - 2, totVX, y - 2);
+        y += 2;
+    };
+
+    drawTaxRow('Subtotal', fmtCurrency(subtotal));
+    drawTaxRow('DPP (11/12)', fmtCurrency(dpp));
+    drawTaxRow('PPN 12%', fmtCurrency(ppn));
+    if (pph23 > 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23));
+    drawTaxDivider();
+    y += 2;
+    drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
+    y += 4;
+
+    // ── TERBILANG ─────────────────────────────────────────────────
+    const tbText = terbilangID(grandTotal);
+    doc.setFillColor(...C.LIGHT_BG);
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.4);
+    doc.roundedRect(mL, y, W, 10, 2, 2, 'FD');
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(10);
-    doc.setTextColor(255, 255, 255);
-    doc.text('GRAND TOTAL', totX, y);
-    doc.text(fmtCurrency(subtotal + ppn), totVX, y, { align: 'right' });
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('Terbilang:', mL + 4, y + 4);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor(...C.DARK);
+    const tbLines = doc.splitTextToSize(tbText, W - 36);
+    doc.text(tbLines, mL + 30, y + 4);
+    y += 16;
 
-    doc.save(`${tx.docNumber}.pdf`);
+    // ── PAYMENT INFO + QR CODE ────────────────────────────────────
+    const hasBank = settings.bankName || settings.bankAccount || settings.bankHolder;
+    if (hasBank || qrDataUrl) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8.5);
+        doc.setTextColor(...C.PRIMARY);
+        doc.text('PAYMENT INFORMATION', mL, y);
+        y += 5;
+
+        const qrSize = 30;
+        const bankColW = W - qrSize - 10;
+
+        // Bank details box
+        doc.setFillColor(...C.LIGHT_BG);
+        doc.setDrawColor(...C.BORDER);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(mL, y, bankColW, qrSize + 4, 2, 2, 'FD');
+
+        let by = y + 6;
+        const bankRows = [
+            ['Bank', settings.bankName || '-'],
+            ['No. Rek.', settings.bankAccount || '-'],
+            ['Atas Nama', settings.bankHolder || '-'],
+        ];
+        bankRows.forEach(([lbl, val]) => {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(...C.SECONDARY);
+            doc.text(lbl, mL + 5, by);
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(...C.DARK);
+            doc.text(val, mL + 28, by);
+            by += 5.5;
+        });
+
+        // QR Code
+        if (qrDataUrl) {
+            try {
+                const qrX = mL + bankColW + 10;
+                doc.setDrawColor(...C.BORDER);
+                doc.setLineWidth(0.3);
+                doc.roundedRect(qrX - 2, y, qrSize + 4, qrSize + 4, 2, 2, 'S');
+                doc.addImage(qrDataUrl, 'PNG', qrX, y + 2, qrSize, qrSize);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(6);
+                doc.setTextColor(...C.SECONDARY);
+                doc.text('Scan to Pay', qrX + qrSize / 2, y + qrSize + 7, { align: 'center' });
+            } catch (e) { }
+        }
+
+        y += qrSize + 12;
+    }
+
+    // ── NOTES ─────────────────────────────────────────────────────
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.line(mL, y, pageW - mR, y);
+    y += 5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('Catatan:', mL, y);
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('1. Mohon lampirkan bukti transfer saat melakukan pembayaran.', mL, y); y += 4;
+    doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
+    if (dueDate) doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y);
+    y += 8;
+
+    // ── SIGNATURE ─────────────────────────────────────────────────
+    if (y + 45 > pageH - 20) { doc.addPage(); y = 25; }
+
+    const sigRX = pageW - mR - 40;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Hormat kami,', sigRX, y, { align: 'center' });
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.DARK);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigRX, y + 4, { align: 'center' });
+
+    const currentUser = window.store.currentUser;
+    const loggedUser = (window.store.users || []).find(u => u.username === currentUser?.username);
+    if (loggedUser?.signature) {
+        try { doc.addImage(loggedUser.signature, 'AUTO', sigRX - 22, y + 6, 44, 22); } catch (e) { }
+    }
+
+    y += 34;
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.4);
+    doc.line(sigRX - 28, y, sigRX + 28, y);
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.DARK);
+    doc.text(currentUser?.username || 'Authorized', sigRX, y, { align: 'center' });
+    y += 4;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Finance / Accounting', sigRX, y, { align: 'center' });
+
+    // ── FOOTER ────────────────────────────────────────────────────
+    const footY = pageH - 8;
+    doc.setFillColor(...C.PRIMARY);
+    doc.rect(0, footY - 5, pageW, 1.5, 'F');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text(`${settings.name || 'PT IDE SOLUSI INTEGRASI'}  ·  ${settings.phone || ''}  ·  ${tx.docNumber || ''}`, pageW / 2, footY, { align: 'center' });
+
+    doc.save(`${tx.docNumber || 'Invoice'}.pdf`);
 }
 
 window.printPDF = printPDF;

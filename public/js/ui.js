@@ -419,6 +419,13 @@
                         <div class="form-group"><label>Address</label><textarea name="address">${s.address || ''}</textarea></div>
                         <div class="form-group"><label>Phone</label><input type="text" name="phone" value="${s.phone || ''}"></div>
                         <div class="form-group"><label>NPWP Perusahaan</label><input type="text" name="npwp" value="${s.npwp || ''}" placeholder="Contoh: 01.234.567.8-901.000"></div>
+                        <hr style="margin: 20px 0; border-color: var(--border-color);">
+                        <h4 style="margin-bottom: 15px; color: var(--text-secondary);"><i class="fa-solid fa-building-columns" style="margin-right: 8px;"></i>Bank Information (for Invoice)</h4>
+                        <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                            <div class="form-group"><label>Nama Bank</label><input type="text" name="bankName" value="${s.bankName || ''}" placeholder="Contoh: Bank BCA"></div>
+                            <div class="form-group"><label>Nomor Rekening</label><input type="text" name="bankAccount" value="${s.bankAccount || ''}" placeholder="Contoh: 123-456-7890"></div>
+                            <div class="form-group"><label>Atas Nama</label><input type="text" name="bankHolder" value="${s.bankHolder || ''}" placeholder="Nama pemilik rekening"></div>
+                        </div>
                         <div class="form-group">
                             <label>Company Logo</label>
                             <div style="display: flex; align-items: center; gap: 20px; margin-top: 8px;">
@@ -450,7 +457,10 @@
                     name: formData.get('name'),
                     address: formData.get('address'),
                     phone: formData.get('phone'),
-                    npwp: formData.get('npwp')
+                    npwp: formData.get('npwp'),
+                    bankName: formData.get('bankName'),
+                    bankAccount: formData.get('bankAccount'),
+                    bankHolder: formData.get('bankHolder')
                 };
                 if (logoData) data.logo = logoData;
                 else if (logoData === '__REMOVE__') data.logo = '';
@@ -1071,9 +1081,108 @@
         try {
             const isDO = type === 'DO';
             const isBAP = type === 'BAP';
+            const isINV = type === 'INV';
             const isDraftForm = isDO || isBAP;
             const lockedCat = isDO ? 'Barang' : 'Service';
             const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
+
+            // ── INV FORM (Invoice from Quotation) ────────────────────────────
+            if (isINV) {
+                const invoiceDate = tx.date ? tx.date.substring(0, 10) : new Date().toISOString().substring(0, 10);
+                const dueDate = new Date(invoiceDate);
+                dueDate.setDate(dueDate.getDate() + 30);
+                const dueDateStr = dueDate.toISOString().substring(0, 10);
+
+                const allTx = window.store.transactions || [];
+                const clientDOs = allTx.filter(t => t.type === 'DO' && t.client_id === tx.clientId);
+                const clientBASTs = allTx.filter(t => t.type === 'BAP' && t.client_id === tx.clientId);
+                const doOptions = clientDOs.map(d => `<option value="${d.doc_number}">${d.doc_number}</option>`).join('');
+                const bastOptions = clientBASTs.map(d => `<option value="${d.doc_number}">${d.doc_number}</option>`).join('');
+
+                const hdrS = 'font-weight:600;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;';
+                const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 90px 140px 90px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
+                    <span style="${hdrS}">Category</span><span style="${hdrS}">Product</span><span style="${hdrS}">Qty</span>
+                    <span style="${hdrS}">Unit</span><span style="${hdrS}">Price</span><span style="${hdrS}">Margin %</span>
+                    <span style="${hdrS}">Remarks</span><span></span></div>`;
+
+                const content = `
+                    <h3>New Invoice (from Quotation)</h3>
+                    <form id="transaction-form">
+                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;">
+                            <div class="form-group"><label>Invoice Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required readonly style="background:#f1f5f9;cursor:not-allowed;"></div>
+                            <div class="form-group"><label>Invoice Date</label><input type="date" name="date" id="inv-date" value="${invoiceDate}" required></div>
+                            <div class="form-group"><label>Client</label>
+                                <select name="clientId" required>
+                                    <option value="">Select Client</option>
+                                    ${window.store.clients.map(c => `<option value="${c.id}" ${tx.clientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px;">
+                            <div class="form-group"><label>Due Date</label><input type="date" name="dueDate" id="inv-due-date" value="${dueDateStr}" required></div>
+                            <div class="form-group"><label>U.P. / Attention (Opsional)</label><input type="text" name="attention" placeholder="Nama PIC klien"></div>
+                            <div class="form-group"><label>PO Reference</label><input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Nomor PO"></div>
+                        </div>
+                        <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
+                            <div class="form-group"><label>Referensi DO</label>
+                                <select name="doRef"><option value="">-- Pilih DO (opsional) --</option>${doOptions}</select>
+                            </div>
+                            <div class="form-group"><label>Referensi BAST</label>
+                                <select name="bastRef"><option value="">-- Pilih BAST (opsional) --</option>${bastOptions}</select>
+                            </div>
+                        </div>
+                        <h4 style="margin-top:20px;margin-bottom:10px;">Items</h4>
+                        ${itemsHeader}
+                        <div id="tx-items-container"></div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addTxItemRow()" style="margin-top:10px;">+ Add Item</button>
+                        <div style="margin-top:20px;">
+                            <button type="submit" class="btn btn-primary">Save Invoice</button>
+                            <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                        </div>
+                    </form>`;
+                this.openModal(content);
+
+                document.getElementById('inv-date').addEventListener('change', (e) => {
+                    const d = new Date(e.target.value);
+                    d.setDate(d.getDate() + 30);
+                    document.getElementById('inv-due-date').value = d.toISOString().substring(0, 10);
+                });
+
+                this.currentItemIndex = 0;
+                if (tx.items && tx.items.length > 0) tx.items.forEach(item => this.addTxItemRow(item));
+                else this.addTxItemRow();
+
+                document.getElementById('transaction-form').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.target);
+                    const items = [];
+                    document.querySelectorAll('.tx-item-row').forEach(row => {
+                        const idx = row.dataset.index;
+                        items.push({
+                            itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 0,
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
+                            category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                            unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
+                        });
+                    });
+                    const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '' };
+                    const data = {
+                        type: 'INV', docNumber: fd.get('docNumber'), customerPo: fd.get('customerPo') || '',
+                        date: fd.get('date'), clientId: fd.get('clientId'), status: 'Draft', terms: '',
+                        invoiceNotes: JSON.stringify(invMeta), items
+                    };
+                    try {
+                        await window.store.addTransaction(data, items);
+                        this.closeModal();
+                        this.renderTransactions('INV');
+                    } catch (err) { alert('Gagal menyimpan Invoice: ' + err.message); }
+                };
+                return; // INV handled
+            }
+            // ── END INV ──────────────────────────────────────────────────────
 
             let itemsHeader;
             if (isDO) {

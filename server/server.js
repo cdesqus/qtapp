@@ -336,7 +336,7 @@ app.post('/api/transactions', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { type, docNumber, customerPo, date, clientId, terms, status, items } = req.body;
+        const { type, docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes } = req.body;
 
         // Check duplicate PO number — for DO and BAP (BAST) types
         if ((type === 'DO' || type === 'BAP') && customerPo) {
@@ -349,8 +349,8 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         }
 
         const txResult = await client.query(
-            'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-            [type, docNumber, customerPo, date, clientId, terms, status]
+            'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
+            [type, docNumber, customerPo, date, clientId, terms, status, invoiceNotes || null]
         );
         const txId = txResult.rows[0].id;
 
