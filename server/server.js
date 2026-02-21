@@ -411,6 +411,17 @@ app.delete('/api/transactions/:id', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ── Admin: purge all transactions (admin only) ──
+app.delete('/api/transactions/all/purge', authenticate, async (req, res) => {
+    if (req.user.role !== 'admin') return res.status(403).json({ error: 'Unauthorized' });
+    try {
+        await pool.query('DELETE FROM transaction_items');
+        await pool.query('DELETE FROM transactions');
+        res.json({ success: true, message: 'All transactions cleared.' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
 app.patch('/api/transactions/:id/status', authenticate, async (req, res) => {
     const { status } = req.body;
     try {
