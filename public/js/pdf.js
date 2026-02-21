@@ -1192,16 +1192,16 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         categoryMap[cat].push(item);
     });
 
-    // Build body rows: insert a full-span category header before each group
+    // Build body rows: insert a full-span (merged) category header before each group
     const catDisplayName = { 'Barang': 'GOODS', 'Service': 'SERVICE' };
     const tableBody = [];
     const categoryRowIndices = new Set(); // track which row indices are category headers
     let itemNo = 1;
     categoryOrder.forEach(cat => {
-        // Category header row — put label in col 1, rest empty
         const catLabel = catDisplayName[cat] || cat.toUpperCase();
         categoryRowIndices.add(tableBody.length);
-        tableBody.push(['', catLabel, '', '', '', '']);
+        // colSpan:6 merges across all 6 columns
+        tableBody.push([{ content: catLabel, colSpan: 6 }]);
         categoryMap[cat].forEach(item => {
             tableBody.push([
                 String(itemNo++),
@@ -1223,7 +1223,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         tableWidth: W,
         styles: {
             font: 'helvetica', fontSize: 8.5,
-            cellPadding: { top: 4, bottom: 4, left: 4, right: 4 },
+            cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 4 },
             textColor: C.DARK, lineColor: C.BORDER, lineWidth: 0.1, valign: 'middle'
         },
         headStyles: {
@@ -1240,12 +1240,13 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         alternateRowStyles: { fillColor: C.LIGHT_BG },
         didParseCell: (data) => {
             if (data.section === 'body' && categoryRowIndices.has(data.row.index)) {
-                // Style category header rows — light grey, bold, no color
+                // Merged category header: light slate bg, dark bold text, left-aligned
                 data.cell.styles.fillColor = [241, 245, 249];
                 data.cell.styles.textColor = [30, 41, 59];
                 data.cell.styles.fontStyle = 'bold';
                 data.cell.styles.fontSize = 7.5;
-                data.cell.styles.cellPadding = { top: 3, bottom: 3, left: 6, right: 4 };
+                data.cell.styles.halign = 'left';
+                data.cell.styles.cellPadding = { top: 2.5, bottom: 2.5, left: 6, right: 4 };
             }
         }
     });
@@ -1320,71 +1321,9 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.text(tbLines, mL + 30, y + 4);
     y += 16;
 
-    // ── PAYMENT INFO + QR CODE ────────────────────────────────────
+    // Bank info vars (used below in plain-text payment section)
     const hasBank = settings.bankName || settings.bankAccount || settings.bankHolder;
     const hasBank2 = settings.bank2Name || settings.bank2Account || settings.bank2Holder;
-    if (hasBank || hasBank2 || qrDataUrl) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8.5);
-        doc.setTextColor(...C.PRIMARY);
-        doc.text('PAYMENT INFORMATION', mL, y);
-        y += 5;
-
-        const qrSize = 30;
-        // Split available width: bank1 | bank2 | QR
-        const numBanks = (hasBank ? 1 : 0) + (hasBank2 ? 1 : 0);
-        const totalBankW = W - (qrDataUrl ? qrSize + 10 : 0);
-        const bankBoxW = numBanks > 1 ? (totalBankW - 8) / 2 : totalBankW;
-
-        const drawBankBox = (startX, boxW, bankName, bankAccount, bankHolder) => {
-            doc.setFillColor(...C.LIGHT_BG);
-            doc.setDrawColor(...C.BORDER);
-            doc.setLineWidth(0.3);
-            doc.roundedRect(startX, y, boxW, qrSize + 4, 2, 2, 'FD');
-            let by = y + 6;
-            const rows = [
-                ['Bank', bankName || '-'],
-                ['No. Rek.', bankAccount || '-'],
-                ['Atas Nama', bankHolder || '-'],
-            ];
-            rows.forEach(([lbl, val]) => {
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(8);
-                doc.setTextColor(...C.SECONDARY);
-                doc.text(lbl, startX + 5, by);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(...C.DARK);
-                doc.text(val, startX + 28, by);
-                by += 5.5;
-            });
-        };
-
-        let bankStartX = mL;
-        if (hasBank) {
-            drawBankBox(bankStartX, bankBoxW, settings.bankName, settings.bankAccount, settings.bankHolder);
-            bankStartX += bankBoxW + 8;
-        }
-        if (hasBank2) {
-            drawBankBox(bankStartX, bankBoxW, settings.bank2Name, settings.bank2Account, settings.bank2Holder);
-        }
-
-        // QR Code
-        if (qrDataUrl) {
-            try {
-                const qrX = mL + totalBankW + 10;
-                doc.setDrawColor(...C.BORDER);
-                doc.setLineWidth(0.3);
-                doc.roundedRect(qrX - 2, y, qrSize + 4, qrSize + 4, 2, 2, 'S');
-                doc.addImage(qrDataUrl, 'PNG', qrX, y + 2, qrSize, qrSize);
-                doc.setFont('helvetica', 'normal');
-                doc.setFontSize(6);
-                doc.setTextColor(...C.SECONDARY);
-                doc.text('Scan to Pay', qrX + qrSize / 2, y + qrSize + 7, { align: 'center' });
-            } catch (e) { }
-        }
-
-        y += qrSize + 12;
-    }
 
     // ── NOTES ─────────────────────────────────────────────────────
     doc.setDrawColor(...C.BORDER);
@@ -1402,8 +1341,44 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...C.SECONDARY);
     doc.text('1. Mohon lampirkan bukti transfer saat melakukan pembayaran.', mL, y); y += 4;
     doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
-    if (dueDate) doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y);
-    y += 10;
+    if (dueDate) { doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y); y += 4; }
+    y += 4;
+
+    // ── PAYMENT INFORMATION (plain text below catatan) ─────────────
+    if (hasBank || hasBank2) {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.PRIMARY);
+        doc.text('Transfer Pembayaran ke:', mL, y);
+        y += 4.5;
+
+        const printBank = (bankName, bankAccount, bankHolder, label) => {
+            if (!bankName && !bankAccount) return;
+            if (label) {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.8);
+                doc.setTextColor(...C.DARK);
+                doc.text(label, mL, y); y += 3.8;
+            }
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(7.8);
+            doc.setTextColor(...C.SECONDARY);
+            if (bankName) { doc.text(`Bank          : ${bankName}`, mL + 4, y); y += 3.8; }
+            if (bankAccount) { doc.text(`No. Rekening  : ${bankAccount}`, mL + 4, y); y += 3.8; }
+            if (bankHolder) { doc.text(`Atas Nama     : ${bankHolder}`, mL + 4, y); y += 3.8; }
+        };
+
+        if (hasBank && hasBank2) {
+            printBank(settings.bankName, settings.bankAccount, settings.bankHolder, 'Rekening 1:');
+            y += 2;
+            printBank(settings.bank2Name, settings.bank2Account, settings.bank2Holder, 'Rekening 2:');
+        } else if (hasBank) {
+            printBank(settings.bankName, settings.bankAccount, settings.bankHolder, null);
+        } else {
+            printBank(settings.bank2Name, settings.bank2Account, settings.bank2Holder, null);
+        }
+        y += 4;
+    }
 
     // ── SIGNATURE AREA (below notes, right side) ───────────────
     const sigBoxW = 70;
