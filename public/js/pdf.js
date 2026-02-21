@@ -1319,21 +1319,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
     y += 4;
 
-    // ── TERBILANG ─────────────────────────────────────────────────
-    const tbText = terbilangID(grandTotal);
-    doc.setFillColor(...C.LIGHT_BG);
-    doc.setDrawColor(...C.PRIMARY);
-    doc.setLineWidth(0.4);
-    doc.roundedRect(mL, y, W, 10, 2, 2, 'FD');
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...C.PRIMARY);
-    doc.text('Terbilang:', mL + 4, y + 4);
-    doc.setFont('helvetica', 'italic');
-    doc.setTextColor(...C.DARK);
-    const tbLines = doc.splitTextToSize(tbText, W - 36);
-    doc.text(tbLines, mL + 30, y + 4);
-    y += 16;
+    y += 2;
 
     // Bank info vars (used below in plain-text payment section)
     const hasBank = settings.bankName || settings.bankAccount || settings.bankHolder;

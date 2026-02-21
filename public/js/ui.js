@@ -14,51 +14,176 @@
         try {
             const container = document.getElementById('content-area');
             if (!container) return;
-            const transactions = window.store.transactions || [];
+
+            const txs = window.store.transactions || [];
             const clients = window.store.clients || [];
+            const products = window.store.products || [];
+
+            // ── Date helpers ──────────────────────────────────────────────
+            const now = new Date();
+            const thisMonth = now.getMonth();
+            const thisYear = now.getFullYear();
+            const isThisMonth = d => {
+                const dt = new Date(d);
+                return dt.getMonth() === thisMonth && dt.getFullYear() === thisYear;
+            };
+
+            // ── Calc selling price of a transaction ───────────────────────
+            const calcTxTotal = (tx) => {
+                return (tx.items || []).reduce((sum, item) => {
+                    const price = Number(item.price || item.cost || 0);
+                    const margin = Number(item.margin || 0);
+                    const qty = Number(item.qty || 0);
+                    return sum + price * (1 + margin / 100) * qty;
+                }, 0);
+            };
+            const calcTxCost = (tx) => {
+                return (tx.items || []).reduce((sum, item) => {
+                    const cost = Number(item.price || item.cost || 0);
+                    const qty = Number(item.qty || 0);
+                    return sum + cost * qty;
+                }, 0);
+            };
+
+            // ── Profit this month (from Invoices) ─────────────────────────
+            const invThisMonth = txs.filter(t => t.type === 'INV' && isThisMonth(t.date));
+            const revenueThisMonth = invThisMonth.reduce((s, t) => s + calcTxTotal(t), 0);
+            const costThisMonth = invThisMonth.reduce((s, t) => s + calcTxCost(t), 0);
+            const profitThisMonth = revenueThisMonth - costThisMonth;
+
+            // ── All time stats ─────────────────────────────────────────────
+            const allInv = txs.filter(t => t.type === 'INV');
+            const unpaidInv = allInv.filter(t => (t.status || '').toLowerCase() !== 'paid');
+            const paidInv = allInv.filter(t => (t.status || '').toLowerCase() === 'paid');
+            const totalRevenue = paidInv.reduce((s, t) => s + calcTxTotal(t), 0);
+            const quoCount = txs.filter(t => t.type === 'QUO').length;
+            const doCount = txs.filter(t => t.type === 'DO').length;
+            const bastCount = txs.filter(t => t.type === 'BAP').length;
+
+            // ── Unpaid: group by client ────────────────────────────────────
+            const unpaidByClient = {};
+            unpaidInv.forEach(t => {
+                const cn = t.clientName || t.client_name || 'Unknown';
+                if (!unpaidByClient[cn]) unpaidByClient[cn] = { client: cn, invoices: [] };
+                const total = calcTxTotal(t);
+                unpaidByClient[cn].invoices.push({ doc: t.docNumber || '-', po: t.customerPo || t.customer_po || '-', total, date: t.date });
+            });
+            const unpaidClients = Object.values(unpaidByClient).sort((a, b) => {
+                const ta = a.invoices.reduce((s, i) => s + i.total, 0);
+                const tb = b.invoices.reduce((s, i) => s + i.total, 0);
+                return tb - ta; // highest owed first
+            });
+            const totalUnpaid = unpaidInv.reduce((s, t) => s + calcTxTotal(t), 0);
+
+            // ── QUO with PO this month ────────────────────────────────────
+            const newPOThisMonth = txs.filter(t => t.type === 'QUO' && (t.customerPo || t.customer_po) && isThisMonth(t.date)).length;
+
+            // ── Format helpers ────────────────────────────────────────────
+            const fmt = v => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
+            const monthName = now.toLocaleString('id-ID', { month: 'long', year: 'numeric' });
 
             container.innerHTML = `
-                <div class="dashboard-grid">
-                    <div class="stat-card">
-                        <h3>Total Quotations</h3>
-                        <div class="value">${transactions.filter(t => t.type === 'QUO').length}</div>
+                <!-- ── KPI Cards ── -->
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:20px;">
+
+                    <div class="card" style="border-top:3px solid var(--success);padding:18px 20px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">Profit ${monthName}</span>
+                            <i class="fa-solid fa-chart-line" style="color:var(--success);font-size:1.1rem;"></i>
+                        </div>
+                        <div style="font-size:1.5rem;font-weight:700;color:${profitThisMonth >= 0 ? 'var(--success)' : 'var(--error)'};">${fmt(profitThisMonth)}</div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;">Revenue: ${fmt(revenueThisMonth)}</div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Active Clients</h3>
-                        <div class="value">${clients.length}</div>
+
+                    <div class="card" style="border-top:3px solid var(--error);padding:18px 20px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">Belum Bayar</span>
+                            <i class="fa-solid fa-clock" style="color:var(--error);font-size:1.1rem;"></i>
+                        </div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--error);">${fmt(totalUnpaid)}</div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;">${unpaidInv.length} invoice dari ${unpaidClients.length} klien</div>
                     </div>
-                    <div class="stat-card">
-                        <h3>Unpaid Invoices</h3>
-                        <div class="value">${transactions.filter(t => t.type === 'INV' && t.status !== 'Paid').length}</div>
+
+                    <div class="card" style="border-top:3px solid var(--primary);padding:18px 20px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">Total Revenue</span>
+                            <i class="fa-solid fa-sack-dollar" style="color:var(--primary);font-size:1.1rem;"></i>
+                        </div>
+                        <div style="font-size:1.5rem;font-weight:700;color:var(--primary);">${fmt(totalRevenue)}</div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;">${paidInv.length} invoice lunas</div>
                     </div>
+
+                    <div class="card" style="border-top:3px solid #a855f7;padding:18px 20px;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                            <span style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;">PO Baru ${monthName}</span>
+                            <i class="fa-solid fa-file-signature" style="color:#a855f7;font-size:1.1rem;"></i>
+                        </div>
+                        <div style="font-size:1.5rem;font-weight:700;color:#a855f7;">${newPOThisMonth}</div>
+                        <div style="font-size:0.78rem;color:var(--text-secondary);margin-top:4px;">Quotation confirmed</div>
+                    </div>
+
                 </div>
-                <div class="card" style="margin-top:20px;">
-                    <h3>Recent Transactions</h3>
-                    <div class="table-container">
-                        <table>
+
+                <!-- ── Summary pills ── -->
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+                    ${[
+                    { label: 'Quotations', val: quoCount, icon: 'fa-file-alt', color: '#3b82f6' },
+                    { label: 'Delivery Orders', val: doCount, icon: 'fa-truck', color: '#10b981' },
+                    { label: 'BAST', val: bastCount, icon: 'fa-handshake', color: '#f59e0b' },
+                    { label: 'Klien', val: clients.length, icon: 'fa-users', color: '#8b5cf6' },
+                    { label: 'Produk', val: products.length, icon: 'fa-box', color: '#ec4899' },
+                ].map(p => `
+                        <div style="display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--card-bg);border:1px solid var(--border-color);border-radius:20px;font-size:0.85rem;">
+                            <i class="fa-solid ${p.icon}" style="color:${p.color};"></i>
+                            <span style="color:var(--text-secondary);">${p.label}</span>
+                            <strong style="color:var(--text-primary);">${p.val}</strong>
+                        </div>
+                    `).join('')}
+                </div>
+
+                <!-- ── Unpaid Invoices ── -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-triangle-exclamation" style="color:var(--error);margin-right:8px;"></i>Siapa yang Belum Bayar?</h3>
+                        <span style="font-size:0.85rem;color:var(--text-secondary);">Total: <strong style="color:var(--error);">${fmt(totalUnpaid)}</strong></span>
+                    </div>
+                    ${unpaidClients.length === 0
+                    ? `<div style="padding:30px;text-align:center;color:var(--text-secondary);">
+                                <i class="fa-solid fa-circle-check" style="font-size:2rem;color:var(--success);display:block;margin-bottom:10px;"></i>
+                                Semua invoice sudah lunas! 🎉
+                           </div>`
+                    : `<div class="table-container"><table>
                             <thead>
                                 <tr>
-                                    <th>Date</th>
-                                    <th>Doc Number</th>
-                                    <th>Client</th>
-                                    <th>Type</th>
-                                    <th>Status</th>
+                                    <th>Klien</th>
+                                    <th>No. Invoice</th>
+                                    <th>PO Number</th>
+                                    <th>Tanggal</th>
+                                    <th style="text-align:right;">Jumlah</th>
+                                    <th>Aksi</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${transactions.length === 0 ? '<tr><td colspan="5" style="text-align:center">No transactions found</td></tr>' :
-                    transactions.slice(0, 5).map(t => `
+                                ${unpaidClients.flatMap(uc => uc.invoices.map((inv, idx) => `
                                     <tr>
-                                        <td>${window.formatDate(t.date)}</td>
-                                        <td>${t.docNumber || '-'}</td>
-                                        <td>${t.clientName || '-'}</td>
-                                        <td>${window.ui.typeLabel(t.type) || '-'}</td>
-                                        <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
+                                        <td style="font-weight:${idx === 0 ? '600' : '400'};color:${idx === 0 ? 'var(--text-primary)' : 'var(--text-secondary)'};">
+                                            ${idx === 0 ? `<i class="fa-solid fa-building" style="color:var(--primary);margin-right:6px;"></i>${uc.client}` : ''}
+                                        </td>
+                                        <td><span style="font-weight:600;color:var(--primary);">${inv.doc}</span></td>
+                                        <td><span style="padding:2px 8px;border-radius:4px;background:rgba(34,197,94,0.1);color:#16a34a;font-size:0.8rem;">${inv.po}</span></td>
+                                        <td style="font-size:0.85rem;color:var(--text-secondary);">${window.formatDate ? window.formatDate(inv.date) : inv.date}</td>
+                                        <td style="text-align:right;font-weight:700;color:var(--error);">${fmt(inv.total)}</td>
+                                        <td>
+                                            <button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);font-size:0.78rem;"
+                                                onclick="window.app.navigateTo('invoices')">
+                                                <i class="fa-solid fa-arrow-right"></i> Lihat
+                                            </button>
+                                        </td>
                                     </tr>
-                                `).join('')}
+                                `)).join('')}
                             </tbody>
-                        </table>
-                    </div>
+                           </table></div>`
+                }
                 </div>
             `;
         } catch (err) {
@@ -66,6 +191,7 @@
             this.showErrorMessage("Gagal memuat dashboard: " + err.message);
         }
     }
+
 
     showErrorMessage(msg) {
         const container = document.getElementById('content-area');
