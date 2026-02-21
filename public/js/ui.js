@@ -974,15 +974,32 @@
 
     async openTransactionForm(type, id = null) {
         try {
-            let tx = id ? await window.store.getTransaction(id) : {
-                type,
-                date: new Date().toISOString().split('T')[0],
-                clientId: '',
-                docNumber: window.store.generateNextDocNumber(type),
-                terms: '',
-                status: 'Draft',
-                items: []
-            };
+            let tx;
+            if (id) {
+                tx = await window.store.getTransaction(id);
+            } else {
+                // Selalu minta doc number dari server agar tidak konflik dengan data di DB
+                const today = new Date().toISOString().split('T')[0];
+                let serverDocNumber;
+                try {
+                    const res = await fetch(`/api/next-doc-number?type=${type}&date=${today}`, { credentials: 'include' });
+                    if (res.ok) {
+                        const data = await res.json();
+                        serverDocNumber = data.docNumber;
+                    }
+                } catch (e) {
+                    console.warn('Could not fetch doc number from server, using local fallback:', e);
+                }
+                tx = {
+                    type,
+                    date: today,
+                    clientId: '',
+                    docNumber: serverDocNumber || window.store.generateNextDocNumber(type),
+                    terms: '',
+                    status: 'Draft',
+                    items: []
+                };
+            }
 
             const isDO = type === 'DO';
             const isBAP = type === 'BAP';
@@ -1038,8 +1055,8 @@
                 <h3>${id ? 'Edit' : 'New'} ${this.typeLabel(type)}</h3>
                 <form id="transaction-form">
                     <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
-                        <div class="form-group"><label>Doc Number</label><input type="text" name="docNumber" value="${tx.docNumber}" required ${!id ? 'readonly style="background:#f1f5f9; cursor:not-allowed;"' : ''}></div>
-                        <div class="form-group"><label>Date</label><input type="date" name="date" value="${tx.date.split('T')[0]}" required></div>
+                        <div class="form-group"><label>Doc Number</label><input type="text" id="tx-doc-number" name="docNumber" value="${tx.docNumber}" required ${!id ? 'readonly style="background:#f1f5f9; cursor:not-allowed;"' : ''}></div>
+                        <div class="form-group"><label>Date</label><input type="date" id="tx-date" name="date" value="${tx.date.split('T')[0]}" required ${!id ? `onchange="window.ui.refreshDocNumber('${type}', this.value)"` : ''}></div>
                         <div class="form-group">
                             <label>Client</label>
                             <select name="clientId" required>
@@ -1903,6 +1920,20 @@
             const dropdown = document.getElementById(`product-dropdown-${idx}`);
             if (dropdown && !row.contains(e.target)) dropdown.style.display = 'none';
         });
+    }
+
+    async refreshDocNumber(type, dateStr) {
+        const docInput = document.getElementById('tx-doc-number');
+        if (!docInput) return;
+        try {
+            const res = await fetch(`/api/next-doc-number?type=${type}&date=${dateStr}`, { credentials: 'include' });
+            if (res.ok) {
+                const data = await res.json();
+                docInput.value = data.docNumber;
+            }
+        } catch (e) {
+            console.warn('Failed to refresh doc number:', e);
+        }
     }
 
     async clearTransactionData() {

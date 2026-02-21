@@ -352,9 +352,15 @@ app.get('/api/transactions', authenticate, async (req, res) => {
 app.get('/api/next-doc-number', authenticate, async (req, res) => {
     const { type, date } = req.query;
     try {
-        const d = date ? new Date(date) : new Date();
-        const year = d.getFullYear();
-        const month = String(d.getMonth() + 1).padStart(2, '0');
+        // Parse date string langsung agar tidak terpengaruh timezone server
+        let year, month;
+        if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+            [year, month] = date.split('-');
+        } else {
+            const now = new Date();
+            year = String(now.getFullYear());
+            month = String(now.getMonth() + 1).padStart(2, '0');
+        }
         const prefixMap = { QUO: `QT${year}${month}`, DO: `DO#${year}${month}`, BAP: `HOP${year}${month}`, INV: `INV${year}${month}` };
         const prefix = prefixMap[type] || `${type}${year}${month}`;
         const result = await pool.query(
@@ -369,6 +375,7 @@ app.get('/api/next-doc-number', authenticate, async (req, res) => {
         res.json({ docNumber: `${prefix}${String(seq).padStart(3, '0')}` });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
 
 
 app.get('/api/transactions/:id', authenticate, async (req, res) => {
