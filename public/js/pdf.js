@@ -1054,46 +1054,46 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         doc.restoreGraphicsState();
     }
 
-    // ── HEADER: Company Info (left) | Logo + INVOICE (right) ─────
-    const logoH = 16;
-    const logoW = 24;
-    const logoX = pageW - mR - logoW;
+    // ── HEADER: Logo + Company Name (left) | "INVOICE" (right) ───
+    const logoSz = 14;  // small square logo next to company name
 
-    // Logo — top right, smaller
+    // Logo — left, next to company name
     if (settings.logo) {
-        try { doc.addImage(settings.logo, 'AUTO', logoX, y, logoW, logoH); } catch (e) { }
+        try { doc.addImage(settings.logo, 'AUTO', mL, y, logoSz, logoSz); } catch (e) { }
     }
+    const nameX = settings.logo ? mL + logoSz + 4 : mL;
 
-    // "INVOICE" right-aligned below logo
+    // Company name beside logo
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(22);
+    doc.setFontSize(12);
     doc.setTextColor(...C.PRIMARY);
-    doc.text('INVOICE', pageW - mR, y + logoH + 6, { align: 'right' });
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', nameX, y + 5);
 
-    // Company info — left
+    // "INVOICE" title — right side, large
     doc.setFont('helvetica', 'bold');
-    doc.setFontSize(13);
+    doc.setFontSize(28);
     doc.setTextColor(...C.PRIMARY);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', mL, y + 7);
+    doc.text('INVOICE', pageW - mR, y + 10, { align: 'right' });
 
+    // Address & phone below company name
     doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
+    doc.setFontSize(7.5);
     doc.setTextColor(...C.SECONDARY);
-    // Split address on actual newlines, then append phone
     const rawAddr = (settings.address || '').split('\n').map(l => l.trim()).filter(Boolean);
     if (settings.phone) rawAddr.push(`Telp: ${settings.phone}`);
-    let addrY = y + 13;
+    let addrY = y + logoSz + 2;
+    const addrMaxW = (pageW - mL - mR) / 2 - 4;
     rawAddr.forEach(line => {
-        const wrapped = doc.splitTextToSize(line, logoX - mL - 6);
+        const wrapped = doc.splitTextToSize(line, addrMaxW);
         doc.text(wrapped, mL, addrY);
-        addrY += wrapped.length * 3.5;
+        addrY += wrapped.length * 3.4;
     });
     if (settings.npwp) {
         doc.text(`NPWP: ${settings.npwp}`, mL, addrY);
-        addrY += 3.5;
+        addrY += 3.4;
     }
 
-    y += Math.max(logoH + 10, addrY - y + 4) + 4;
+    y = addrY + 4;
 
     // ── Accent separator line ────────────────────────────────────
     doc.setDrawColor(...C.PRIMARY);
@@ -1155,7 +1155,6 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
 
     drawDocRow('Invoice No.', tx.docNumber || '-', true, true);
     drawDocRow('Invoice Date', fmtDate(tx.date));
-    if (dueDate) drawDocRow('Due Date', fmtDate(dueDate));
     if (tx.customerPo || tx.customer_po) drawDocRow('PO Reference', tx.customerPo || tx.customer_po);
     if (doRef) drawDocRow('DO Reference', doRef);
     if (bastRef) drawDocRow('BAST Reference', bastRef);
@@ -1355,7 +1354,39 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.text('1. Mohon lampirkan bukti transfer saat melakukan pembayaran.', mL, y); y += 4;
     doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
     if (dueDate) doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y);
-    y += 8;
+    y += 10;
+
+    // ── SIGNATURE AREA (below notes, right side) ───────────────
+    const sigBoxW = 70;
+    const sigBoxX = pageW - mR - sigBoxW;
+    const sigStartY = y;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Hormat kami,', sigBoxX + sigBoxW / 2, sigStartY, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.DARK);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigBoxX + sigBoxW / 2, sigStartY + 5, { align: 'center' });
+
+    // Empty signature space — cukup untuk materai (~40mm)
+    const sigLineY = sigStartY + 52;
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.4);
+    doc.line(sigBoxX + 6, sigLineY, sigBoxX + sigBoxW - 6, sigLineY);
+
+    // Username centered below line
+    const currentUser = window.store.currentUser;
+    const sigCenterX = sigBoxX + sigBoxW / 2;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.DARK);
+    doc.text(currentUser?.username || 'Authorized', sigCenterX, sigLineY + 5, { align: 'center' });
+
+    y = sigLineY + 10;
 
     // ── FOOTER ────────────────────────────────────────────────────
     const footY = pageH - 8;
