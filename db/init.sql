@@ -43,6 +43,7 @@ CREATE TABLE IF NOT EXISTS transactions (
     terms TEXT,
     status TEXT NOT NULL,
     invoice_notes TEXT,
+    project_name TEXT,
     signature TEXT, -- Base64 signature
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );

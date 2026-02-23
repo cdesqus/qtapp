@@ -83,6 +83,7 @@ pool.connect(async (err, client, release) => {
         try {
             await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS signature TEXT');
             await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)');
+            await client.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS project_name TEXT');
             await client.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS pic TEXT');
             console.log('✅ Database migrations applied');
         } catch (e) { console.error('Migration warning:', e.message); }
@@ -391,7 +392,7 @@ app.post('/api/transactions', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { type, docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes } = req.body;
+        const { type, docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, projectName } = req.body;
 
         // Check duplicate PO number — for DO and BAP (BAST) types
         if ((type === 'DO' || type === 'BAP') && customerPo) {
@@ -409,8 +410,8 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         while (attempt < 10) {
             try {
                 const txResult = await client.query(
-                    'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-                    [type, finalDocNumber, customerPo, date, clientId, terms, status, invoiceNotes || null]
+                    'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes, project_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+                    [type, finalDocNumber, customerPo, date, clientId, terms, status, invoiceNotes || null, projectName || null]
                 );
                 const txId = txResult.rows[0].id;
                 for (const item of items) {
@@ -482,7 +483,7 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, signature } = req.body;
+        const { docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, signature, projectName } = req.body;
 
         // Check duplicate PO number — for DO and BAP (BAST) types
         const existingTx = await client.query('SELECT type FROM transactions WHERE id = $1', [id]);
@@ -497,8 +498,8 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
         }
 
         await client.query(
-            'UPDATE transactions SET doc_number=$1, customer_po=$2, date=$3, terms=$4, status=$5, invoice_notes=$6, signature=$7 WHERE id=$8',
-            [docNumber, customerPo, date, terms, status, invoiceNotes, signature, id]
+            'UPDATE transactions SET doc_number=$1, customer_po=$2, date=$3, terms=$4, status=$5, invoice_notes=$6, signature=$7, project_name=$8 WHERE id=$9',
+            [docNumber, customerPo, date, terms, status, invoiceNotes, signature, projectName || null, id]
         );
 
         await client.query('DELETE FROM transaction_items WHERE transaction_id = $1', [id]);

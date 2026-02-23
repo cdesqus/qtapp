@@ -309,7 +309,7 @@ class UI {
             const isDO = type === 'DO';
             const isBAP = type === 'BAP';
             const showPO = isQuo || isDO || isBAP;
-            const colCount = showPO ? 6 : 5;
+            const colCount = showPO ? 7 : 5;
             const label = this.typeLabel(type);
             const hideNewBtn = isDO || isBAP;
             const tableId = `tx-table-${type}`;
@@ -329,7 +329,7 @@ class UI {
                     <div class="table-container">
                         <table id="${tableId}">
                             <thead>
-                                <tr><th>Date</th><th>Number</th>${showPO ? '<th>PO Number</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
+                                <tr><th>Date</th><th>Number</th>${showPO ? '<th>PO Number</th>' : ''}${isQuo ? '<th>Project</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
                             </thead>
                             <tbody>
                                 ${txs.length === 0 ? `<tr><td colspan="${colCount}" style="text-align:center">No ${label} found</td></tr>` :
@@ -338,6 +338,7 @@ class UI {
                                         <td>${window.formatDate(t.date)}</td>
                                         <td>${t.docNumber || '-'}</td>
                                         ${showPO ? `<td>${t.customerPo ? `<span style="padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600;background:rgba(34,197,94,0.15);color:#16a34a;">${t.customerPo}</span>` : '<span style="color:var(--text-secondary);font-size:0.8rem;">-</span>'}</td>` : ''}
+                                        ${isQuo ? `<td>${t.projectName || t.project_name || '<span style="color:var(--text-secondary);font-size:0.8rem;">-</span>'}</td>` : ''}
                                         <td>${t.clientName || '-'}</td>
                                         <td><span class="status-badge status-${(t.status || 'Draft').toLowerCase()}">${t.status || 'Draft'}</span></td>
                                         <td style="white-space: nowrap;">
@@ -1086,6 +1087,11 @@ class UI {
                             </select>
                         </div>
                     </div>
+                    ${type === 'QUO' ? `
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Project Name</label>
+                        <input type="text" name="projectName" value="${tx.projectName || tx.project_name || ''}" placeholder="Enter project name...">
+                    </div>` : ''}
                     ${isBAP ? `
                     <div class="form-group" style="margin-top: 15px;">
                         <label>PO Number</label>
@@ -1187,6 +1193,7 @@ class UI {
                     clientId: formData.get('clientId'),
                     status: tx.status || 'Draft',
                     terms: termsText,
+                    projectName: formData.get('projectName') || '',
                     items
                 };
 
