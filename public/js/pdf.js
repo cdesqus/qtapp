@@ -265,7 +265,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     y += 10;
 
     // ── TERMS & CONDITIONS (after totals, before signature) ──
-    const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled';
+    const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled\n3. This price is valid until 14 days';
     const terms = (tx.terms && typeof tx.terms === 'string' && tx.terms.trim().length > 0) ? tx.terms : defaultTerms;
     if (terms.trim()) {
         doc.setDrawColor(...PDF_COLORS.BORDER);
