@@ -38,6 +38,7 @@ body {
     flex-direction: column;
     padding: 20px;
     border-right: 1px solid var(--border-color);
+    overflow: hidden;
 }
 
 .sidebar .logo {
@@ -54,6 +55,16 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+.sidebar .logout-section {
+    padding-top: 10px;
+    border-top: 1px solid var(--border-color);
+    margin-top: 10px;
+    flex-shrink: 0;
 }
 
 .sidebar nav button {
