@@ -1157,7 +1157,7 @@ class UI {
                             itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
                             qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
                             price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
-                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) || 15,
+                            margin: row.querySelector(`input[name="items[${idx}][margin]"]`).value !== '' ? Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) : 0,
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
                             category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
                             unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
