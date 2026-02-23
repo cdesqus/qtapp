@@ -604,8 +604,7 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...DO_COLORS.DARK);
-    const currentUser = window.store.currentUser;
-    doc.text(currentUser?.username || 'Authorized', sigLeftX, y, { align: 'center' });
+    doc.text('(                                    )', sigLeftX, y, { align: 'center' });
     doc.text('(                                    )', sigRightX, y, { align: 'center' });
 
     y += 4;
@@ -935,11 +934,10 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     sy += 4;
 
     // Names
-    const currentUser = window.store.currentUser;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...C.DARK);
-    doc.text(currentUser?.username || 'Authorized', sigLX, sy, { align: 'center' });
+    doc.text('(                                    )', sigLX, sy, { align: 'center' });
     doc.text('(                                    )', sigRX, sy, { align: 'center' });
 
     sy += 4;
@@ -1277,10 +1275,11 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     });
 
     // Correct formula: DPP = Subtotal * 11/12, PPN = DPP * 12%, PPH23 = serviceAmt * 2%
+    subtotal = Math.round(subtotal);
     const dpp = Math.round(subtotal * 11 / 12);
-    const ppn = dpp * 0.12;
-    const pph23 = serviceAmt * 0.02;
-    const grandTotal = subtotal + ppn + pph23;   // per user spec: Subtotal + PPN + PPH23
+    const ppn = Math.round(dpp * 0.12);
+    const pph23 = Math.round(serviceAmt * 0.02);
+    const grandTotal = Math.round(subtotal + ppn + pph23);   // per user spec: Subtotal + PPN + PPH23
 
     const totX = pageW - mR - 82;
     const totVX = pageW - mR;
