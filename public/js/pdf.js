@@ -1056,6 +1056,11 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     const bastRef = meta.bastRef || '';
     const isPaid = (tx.status || '').toLowerCase() === 'paid';
 
+    // Logic for conditional references based on item categories
+    const items = tx.items || [];
+    const hasBarang = items.some(i => (i.category || '').toLowerCase().includes('barang'));
+    const hasService = items.some(i => (i.category || '').toLowerCase().includes('service'));
+
     // Build QR content from bank info
     const bankQrText = [
         settings.bankName ? `Bank: ${settings.bankName}` : '',
@@ -1185,13 +1190,12 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     drawDocRow('Invoice No.', tx.docNumber || '-', true, true);
     drawDocRow('Invoice Date', fmtDate(tx.date));
     if (tx.customerPo || tx.customer_po) drawDocRow('PO Reference', tx.customerPo || tx.customer_po);
-    if (doRef) drawDocRow('DO Reference', doRef);
-    if (bastRef) drawDocRow('BAST Reference', bastRef);
+    if (doRef && hasBarang) drawDocRow('DO Reference', doRef);
+    if (bastRef && hasService) drawDocRow('BAST Reference', bastRef);
 
     y = Math.max(y + 6, ry + 4);
 
     // ── ITEMS TABLE ───────────────────────────────────────────────
-    const items = tx.items || [];
     const resolvedItems = items.map(item => {
         let name = item.itemName || item.item_name || '';
         let desc = item.itemDescription || item.item_description || '';
