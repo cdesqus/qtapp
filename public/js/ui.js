@@ -269,12 +269,21 @@ class UI {
             const products = window.store.products || [];
             container.innerHTML = `
                 <div class="card">
-                    <div class="card-header">
-                        <h3>Products & Services</h3>
-                        <button class="btn btn-primary" onclick="window.ui.openProductForm()"><i class="fa-solid fa-plus"></i> New Product</button>
+                <div class="card-header">
+                    <h3>Products & Services</h3>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="position:relative;">
+                            <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
+                            <input type="text" id="search-products" placeholder="Search products..." oninput="window.ui.filterTable('products-table', this.value)"
+                                style="padding:7px 10px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;">
+                        </div>
+                        <button class="btn btn-primary" onclick="window.ui.openProductForm()">
+                            <i class="fa-solid fa-plus"></i> New Product
+                        </button>
                     </div>
-                    <div class="table-container">
-                        <table>
+                </div>
+                <div class="table-container">
+                    <table id="products-table">
                             <thead>
                                 <tr><th>Name</th><th>Category</th><th>Price</th><th>Actions</th></tr>
                             </thead>
