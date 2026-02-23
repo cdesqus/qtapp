@@ -209,7 +209,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         },
         columnStyles: {
             0: { cellWidth: 12, halign: 'center' },
-            1: { cellWidth: 'auto', textColor: PDF_COLORS.SECONDARY },
+            1: { cellWidth: 'auto' },
             2: { cellWidth: 20, halign: 'center' },
             3: { cellWidth: 35, halign: 'right' },
             4: { cellWidth: 38, halign: 'right' }
