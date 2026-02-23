@@ -1283,13 +1283,26 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
 
     y = doc.lastAutoTable.finalY + 8;
 
+    // --- Page Check for Tax Summary ---
+    if (y > pageH - 65) {
+        doc.addPage();
+        y = 25;
+        if (isPaid) {
+            doc.saveGraphicsState();
+            doc.setGState(new doc.GState({ opacity: 0.12 }));
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(88); doc.setTextColor(...C.GREEN);
+            doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+            doc.restoreGraphicsState();
+        }
+    }
+
     // ── TAX SUMMARY ───────────────────────────────────────────────
     let subtotal = 0;
     let serviceAmt = 0;
 
     resolvedItems.forEach(item => {
         subtotal += item.amount;
-        if ((item.category || '').toLowerCase().includes('service') || (item.category || '').toLowerCase().includes('service')) {
+        if ((item.category || '').toLowerCase().includes('service')) {
             serviceAmt += item.amount;
         }
     });
@@ -1341,6 +1354,19 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     // Bank info vars (used below in plain-text payment section)
     const hasBank = settings.bankName || settings.bankAccount || settings.bankHolder;
     const hasBank2 = settings.bank2Name || settings.bank2Account || settings.bank2Holder;
+
+    // --- Page Check for Notes & Footer Area ---
+    if (y > pageH - 85) {
+        doc.addPage();
+        y = 25;
+        if (isPaid) {
+            doc.saveGraphicsState();
+            doc.setGState(new doc.GState({ opacity: 0.12 }));
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(88); doc.setTextColor(...C.GREEN);
+            doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+            doc.restoreGraphicsState();
+        }
+    }
 
     // ── NOTES ─────────────────────────────────────────────────────
     doc.setDrawColor(...C.BORDER);
