@@ -1040,12 +1040,13 @@ class UI {
 
             let itemsHeaderHtml, addRowFn;
             if (isDO) {
-                // DO: Category | Product | Qty | SN | Remarks | âœ•
+                // DO: Category | Product | Qty | Unit | SN | Remarks | âœ•
                 itemsHeaderHtml = `
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
+                        <span style="${headerStyle}">Unit</span>
                         <span style="${headerStyle}">Serial Number</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
@@ -1162,7 +1163,7 @@ class UI {
                             category: lockedCat,
                             price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
-                            unit: 'Pcs'
+                            unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
                         });
                     });
                 } else {
@@ -1803,13 +1804,16 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '100px 3fr 80px 2fr 2fr 40px';
+        row.style.gridTemplateColumns = '100px 3fr 80px 80px 2fr 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
         row.dataset.index = idx;
 
         const inputStyle = 'width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;';
+
+        const activeUnit = (item ? item.unit : '') || 'Pcs';
+        const unitOptions = (window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr']).map(u => `<option value="${u}" ${u === activeUnit ? 'selected' : ''}>${u}</option>`).join('');
 
         row.innerHTML = `
             <select name="items[${idx}][category]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f1f5f9; cursor:not-allowed;" disabled>
@@ -1826,6 +1830,9 @@ class UI {
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle} text-align: center;">
+            <select name="items[${idx}][unit]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
+                ${unitOptions}
+            </select>
             <input type="text" name="items[${idx}][sn]" value="${item ? item.sn || '' : ''}" placeholder="Serial Number" style="${inputStyle}">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
