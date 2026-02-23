@@ -61,6 +61,7 @@ const printPDF = async (id) => {
 function generateQuotationPDF(jsPDF, tx, settings, client) {
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
     const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
     const marginL = 18;
     const marginR = 18;
     const contentW = pageW - marginL - marginR;
