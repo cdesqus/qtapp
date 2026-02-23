@@ -159,6 +159,15 @@ header h1 {
     box-shadow: var(--shadow);
 }
 
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color);
+}
+
 .card h3 {
     font-size: 0.9rem;
     color: var(--text-secondary);
@@ -176,15 +185,16 @@ header h1 {
 .table-container {
     background-color: var(--card-bg);
     border-radius: 12px;
-    padding: 20px;
     border: 1px solid var(--border-color);
-    overflow-x: auto;
+    overflow: auto;
+    max-height: calc(100vh - 250px);
 }
 
 table {
     width: 100%;
     border-collapse: collapse;
     color: var(--text-primary);
+    background-color: var(--card-bg);
 }
 
 th,
@@ -200,6 +210,12 @@ th {
     font-size: 0.85rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
+    position: sticky;
+    top: 0;
+    background-color: #f8fafc;
+    /* Subtle grey for header */
+    z-index: 2;
+    box-shadow: inset 0 -1px 0 var(--border-color);
 }
 
 tr:last-child td {
