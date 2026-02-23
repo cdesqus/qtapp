@@ -1294,12 +1294,12 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         }
     });
 
-    // Correct formula: DPP = Subtotal * 11/12, PPN = DPP * 12%, PPH23 = serviceAmt * 2%
+    // Correct formula: DPP = Subtotal * 11/12, PPN = DPP * 12%, PPH23 = serviceAmt * -2%
     subtotal = Math.round(subtotal);
     const dpp = Math.round(subtotal * 11 / 12);
     const ppn = Math.round(dpp * 0.12);
-    const pph23 = Math.round(serviceAmt * 0.02);
-    const grandTotal = Math.round(subtotal + ppn + pph23);   // per user spec: Subtotal + PPN + PPH23
+    const pph23 = Math.round(serviceAmt * -0.02);
+    const grandTotal = Math.round(subtotal + ppn + pph23);   // pph23 is now a deduction
 
     const totX = pageW - mR - 82;
     const totVX = pageW - mR;
@@ -1330,7 +1330,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     drawTaxRow('Subtotal', fmtCurrency(subtotal));
     drawTaxRow('DPP', fmtCurrency(dpp));
     drawTaxRow('PPN 12%', fmtCurrency(ppn));
-    if (pph23 > 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23));
+    if (pph23 !== 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23));
     drawTaxDivider();
     y += 2;
     drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
