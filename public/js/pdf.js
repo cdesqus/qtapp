@@ -252,6 +252,13 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         y += bold ? 8 : 6;
     };
 
+    // Check for page break before totals
+    const totalsAreaH = 30;
+    if (y + totalsAreaH > pageH - 10) {
+        doc.addPage();
+        y = 25;
+    }
+
     drawTotalRow('Subtotal', fmtCurrency(subtotal));
 
     // PPN
@@ -286,8 +293,20 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         const termLines = terms.split('\n').filter(l => l.trim());
         termLines.forEach(line => {
             const wrapped = doc.splitTextToSize(line.trim(), contentW);
+            const lineH = wrapped.length * 3.5 + 1;
+
+            // Page break check inside terms loop
+            if (y + lineH > doc.internal.pageSize.getHeight() - 15) {
+                doc.addPage();
+                y = 20;
+                // Re-apply font settings for the new page
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(...PDF_COLORS.SECONDARY);
+            }
+
             doc.text(wrapped, marginL, y);
-            y += wrapped.length * 3.5 + 1;
+            y += lineH;
         });
 
         y += 4;
