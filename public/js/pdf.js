@@ -329,7 +329,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8.5);
     doc.setTextColor(...PDF_COLORS.DARK);
-    doc.text(currentUser?.username || 'User', sigLeftX, y);
+    doc.text(loggedUser?.full_name || currentUser?.username || 'User', sigLeftX, y);
     y += 4;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
