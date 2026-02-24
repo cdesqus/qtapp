@@ -104,6 +104,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
     // ── Info Grid: To (left) | Doc Info (right) ──
     // Left side – Client
+    const startInfoY = y;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
@@ -113,14 +114,16 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...PDF_COLORS.DARK);
-    doc.text(client?.name || tx.clientName || '-', marginL, y);
-    y += 4.5;
+    const clientName = client?.name || tx.clientName || '-';
+    const clientNameLines = doc.splitTextToSize(clientName, 90);
+    doc.text(clientNameLines, marginL, y);
+    y += clientNameLines.length * 4.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...PDF_COLORS.SECONDARY);
     if (client?.address) {
-        const clientAddr = doc.splitTextToSize(client.address, 85);
+        const clientAddr = doc.splitTextToSize(client.address, 90);
         doc.text(clientAddr, marginL, y);
         y += clientAddr.length * 3.5;
     }
@@ -131,7 +134,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     // Right side – Document info
     const rightColX = pageW - marginR - 60;
     const rightValX = pageW - marginR;
-    let ry = y - (client?.address ? 12 : 8);
+    let ry = startInfoY + 5; // Align roughly with the first line of the client name
 
     const drawInfoRow = (label, value) => {
         doc.setFont('helvetica', 'normal');
@@ -1156,8 +1159,10 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10.5);
     doc.setTextColor(...C.DARK);
-    doc.text(client?.name || tx.clientName || '-', mL, y);
-    y += 5;
+    const clientName = client?.name || tx.clientName || '-';
+    const clientNameLines = doc.splitTextToSize(clientName, colMid - mL - 6);
+    doc.text(clientNameLines, mL, y);
+    y += clientNameLines.length * 4.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
