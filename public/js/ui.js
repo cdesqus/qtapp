@@ -1059,13 +1059,15 @@ class UI {
         try {
             let tx;
             let bastRefType = 'PO Reference';
+            let bastCustomNote = '';
             if (id) {
                 tx = await window.store.getTransaction(id);
-                // Read existing refType from invoiceNotes for BAST
+                // Read existing refType and customNote from invoiceNotes for BAST
                 if (type === 'BAP' && (tx.invoiceNotes || tx.invoice_notes)) {
                     try {
                         const bastMeta = JSON.parse(tx.invoiceNotes || tx.invoice_notes || '{}');
                         bastRefType = bastMeta.refType || 'PO Reference';
+                        bastCustomNote = bastMeta.customNote || '';
                     } catch (e) { }
                 }
             } else {
@@ -1175,6 +1177,10 @@ class UI {
                             <label>Nomor Referensi</label>
                             <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Nomor PO / Agreement">
                         </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Catatan Tambahan <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;">(opsional, tampil di PDF)</span></label>
+                        <textarea name="bastCustomNote" rows="3" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.5; resize: vertical;" placeholder="Tulis catatan tambahan yang akan ditampilkan di PDF BAST...">${bastCustomNote}</textarea>
                     </div>` : ''}
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
@@ -1306,7 +1312,8 @@ class UI {
                 let invoiceNotes = undefined;
                 if (isBAP) {
                     const bastRefType = formData.get('bastRefType') || 'PO Reference';
-                    invoiceNotes = JSON.stringify({ refType: bastRefType });
+                    const bastCustomNote = formData.get('bastCustomNote') || '';
+                    invoiceNotes = JSON.stringify({ refType: bastRefType, customNote: bastCustomNote });
                 }
 
                 const data = {
@@ -2039,6 +2046,10 @@ class UI {
                             <label>Nomor Referensi</label>
                             <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Nomor PO / Agreement">
                         </div>
+                    </div>
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>Catatan Tambahan <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;">(opsional, tampil di PDF)</span></label>
+                        <textarea name="bastCustomNote" rows="3" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.5; resize: vertical;" placeholder="Tulis catatan tambahan yang akan ditampilkan di PDF BAST..."></textarea>
                     </div>` : ''}
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
@@ -2119,7 +2130,8 @@ class UI {
                 let invoiceNotes = undefined;
                 if (isBAP) {
                     const bastRefType = formData.get('bastRefType') || 'PO Reference';
-                    invoiceNotes = JSON.stringify({ refType: bastRefType });
+                    const bastCustomNote = formData.get('bastCustomNote') || '';
+                    invoiceNotes = JSON.stringify({ refType: bastRefType, customNote: bastCustomNote });
                 }
 
                 const data = {

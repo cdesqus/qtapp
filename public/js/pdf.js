@@ -905,6 +905,45 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     y = doc.lastAutoTable.finalY + 10;
 
     // ─────────────────────────────────────────────────
+    //  CUSTOM NOTE (optional)
+    // ─────────────────────────────────────────────────
+    const customNote = bastMeta.customNote || '';
+    if (customNote.trim()) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.DARK);
+        const noteLines = doc.splitTextToSize(customNote, W - 14);
+        const noteBlockH = noteLines.length * 4 + 6;
+
+        // Page check
+        if (y + noteBlockH > pageH - 80) {
+            doc.addPage();
+            y = 25;
+            // Re-draw watermark on new page
+            if (settings.logo) {
+                try {
+                    doc.saveGraphicsState();
+                    doc.setGState(new doc.GState({ opacity: 0.04 }));
+                    doc.addImage(settings.logo, 'AUTO', (pageW - 90) / 2, (pageH - 90) / 2, 90, 90);
+                    doc.restoreGraphicsState();
+                } catch (e) { }
+            }
+        }
+
+        // Subtle background box with accent bar
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(mL, y - 2, W, noteBlockH, 1.5, 1.5, 'F');
+        doc.setFillColor(...C.PRIMARY);
+        doc.rect(mL, y - 2, 2, noteBlockH, 'F');
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.DARK);
+        doc.text(noteLines, mL + 8, y + 2);
+        y += noteBlockH + 8;
+    }
+
+    // ─────────────────────────────────────────────────
     //  LEGAL STATEMENT
     // ─────────────────────────────────────────────────
     // Accent bar on left
