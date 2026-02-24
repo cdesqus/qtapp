@@ -319,7 +319,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
             y += lineH;
         });
 
-        y += 4;
+        y += 1;
     }
 
     // ── Check page break ──
@@ -330,7 +330,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     }
 
     // ── SIGNATURE AREA ──
-    y += 2;
+    y += 0;
     const sigLeftX = marginL + 15;
 
     doc.setFont('helvetica', 'normal');
