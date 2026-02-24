@@ -1292,7 +1292,7 @@ class UI {
             <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
-            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" max="100" step="0.5"
+            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Amount"
