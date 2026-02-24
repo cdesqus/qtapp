@@ -1174,10 +1174,12 @@ class UI {
                         const marginVal = row.querySelector(`input[name="items[${idx}][margin]"]`).value;
                         const amountVal = row.querySelector(`input[name="items[${idx}][amount]"]`) ? row.querySelector(`input[name="items[${idx}][amount]"]`).value : '';
                         const qtyVal = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value);
-                        // If amount is provided and margin is empty, compute margin from amount
-                        let finalMargin = marginVal !== '' ? Number(marginVal) : 0;
-                        if (amountVal !== '' && marginVal === '' && priceVal > 0 && qtyVal > 0) {
-                            // amount = price * (1 + margin/100) * qty => margin = (amount/(price*qty) - 1) * 100
+
+                        let finalMargin = 0;
+                        if (marginVal !== '') {
+                            finalMargin = Number(marginVal);
+                        } else if (amountVal !== '' && priceVal > 0 && qtyVal > 0) {
+                            // Prioritize manual Amount by calculating required margin
                             finalMargin = (Number(amountVal) / (priceVal * qtyVal) - 1) * 100;
                         }
                         items.push({
@@ -1328,21 +1330,14 @@ class UI {
         }
     }
 
-    // Sync Margin field when Amount changes
+    // Sync Margin field when Amount changes (Manual Amount Mode)
     syncMarginFromAmount(idx) {
         const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
         if (!row) return;
-        const price = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value) || 0;
-        const qty = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value) || 1;
-        const amount = row.querySelector(`input[name="items[${idx}][amount]"]`).value;
         const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
         if (!marginEl) return;
-        if (amount !== '' && price > 0 && qty > 0) {
-            const margin = (Number(amount) / (price * qty) - 1) * 100;
-            marginEl.value = margin.toFixed(2);
-        } else {
-            marginEl.value = '';
-        }
+        // If amount is filled, clear margin to indicate it's ignored (Manual Mode)
+        marginEl.value = '';
     }
 
     onProductSearch(input, idx) {
