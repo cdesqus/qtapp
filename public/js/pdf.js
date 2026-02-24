@@ -166,7 +166,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         return { ...item, resolvedName: name, resolvedDesc: desc };
     });
 
-    const tableHeaders = [['No', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
 
     const tableBody = resolvedItems.map((item, i) => {
         const rawPrice = Number(item.price) || 0;
@@ -216,7 +216,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
             halign: 'center'
         },
         columnStyles: {
-            0: { cellWidth: 10, halign: 'center' },
+            0: { cellWidth: 14, halign: 'center' },
             1: { cellWidth: 'auto' },
             2: { cellWidth: 15, halign: 'center' },
             3: { cellWidth: 30, halign: 'right' },
