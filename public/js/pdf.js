@@ -1000,8 +1000,11 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...C.SECONDARY);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigLX, sy, { align: 'center' });
-    doc.text(client?.name || 'Customer', sigRX, sy, { align: 'center' });
+    const sigNameMaxW = sigBoxW - 10;
+    const companyNameSig = doc.splitTextToSize(settings.name || 'PT IDE SOLUSI INTEGRASI', sigNameMaxW);
+    doc.text(companyNameSig, sigLX, sy, { align: 'center' });
+    const clientNameSig = doc.splitTextToSize(client?.name || 'Customer', sigNameMaxW);
+    doc.text(clientNameSig, sigRX, sy, { align: 'center' });
 
     // ─────────────────────────────────────────────────
     //  FOOTER
