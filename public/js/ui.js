@@ -1058,8 +1058,16 @@ class UI {
     async openTransactionForm(type, id = null) {
         try {
             let tx;
+            let bastRefType = 'PO Reference';
             if (id) {
                 tx = await window.store.getTransaction(id);
+                // Read existing refType from invoiceNotes for BAST
+                if (type === 'BAP' && (tx.invoiceNotes || tx.invoice_notes)) {
+                    try {
+                        const bastMeta = JSON.parse(tx.invoiceNotes || tx.invoice_notes || '{}');
+                        bastRefType = bastMeta.refType || 'PO Reference';
+                    } catch (e) { }
+                }
             } else {
                 // Selalu minta doc number dari server agar tidak konflik dengan data di DB
                 const today = new Date().toISOString().split('T')[0];
@@ -1155,9 +1163,18 @@ class UI {
                         <input type="text" name="projectName" value="${tx.projectName || tx.project_name || ''}" placeholder="Enter project name...">
                     </div>` : ''}
                     ${isBAP ? `
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>PO Number</label>
-                        <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Customer PO Number">
+                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                        <div class="form-group">
+                            <label>Reference Type</label>
+                            <select name="bastRefType">
+                                <option value="PO Reference" ${bastRefType === 'PO Reference' ? 'selected' : ''}>PO Reference</option>
+                                <option value="Agreement Reference" ${bastRefType === 'Agreement Reference' ? 'selected' : ''}>Agreement Reference</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nomor Referensi</label>
+                            <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Nomor PO / Agreement">
+                        </div>
                     </div>` : ''}
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
@@ -1285,6 +1302,13 @@ class UI {
                     }
                 }
 
+                // For BAST, save refType in invoiceNotes
+                let invoiceNotes = undefined;
+                if (isBAP) {
+                    const bastRefType = formData.get('bastRefType') || 'PO Reference';
+                    invoiceNotes = JSON.stringify({ refType: bastRefType });
+                }
+
                 const data = {
                     type,
                     docNumber: formData.get('docNumber'),
@@ -1294,6 +1318,7 @@ class UI {
                     status: tx.status || 'Draft',
                     terms: termsText,
                     projectName: formData.get('projectName') || '',
+                    invoiceNotes: invoiceNotes || undefined,
                     items
                 };
 
@@ -1992,9 +2017,18 @@ class UI {
                         </div>
                     </div>
                     ${isBAP ? `
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>PO Number</label>
-                        <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Customer PO Number">
+                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px;">
+                        <div class="form-group">
+                            <label>Reference Type</label>
+                            <select name="bastRefType">
+                                <option value="PO Reference" selected>PO Reference</option>
+                                <option value="Agreement Reference">Agreement Reference</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Nomor Referensi</label>
+                            <input type="text" name="customerPo" value="${tx.customerPo || ''}" placeholder="Nomor PO / Agreement">
+                        </div>
                     </div>` : ''}
 
                     <h4 style="margin-top: 20px; margin-bottom: 10px;">Items</h4>
@@ -2071,6 +2105,13 @@ class UI {
                     }
                 }
 
+                // For BAST, save refType in invoiceNotes
+                let invoiceNotes = undefined;
+                if (isBAP) {
+                    const bastRefType = formData.get('bastRefType') || 'PO Reference';
+                    invoiceNotes = JSON.stringify({ refType: bastRefType });
+                }
+
                 const data = {
                     type,
                     docNumber: formData.get('docNumber'),
@@ -2079,6 +2120,7 @@ class UI {
                     clientId: formData.get('clientId'),
                     status: 'Draft',
                     terms: termsText,
+                    invoiceNotes: invoiceNotes || undefined,
                     items
                 };
 

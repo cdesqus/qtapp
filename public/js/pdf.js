@@ -682,6 +682,11 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     const W = pageW - mL - mR;
     let y = 18;
 
+    // Parse refType from invoiceNotes metadata
+    let bastMeta = {};
+    try { bastMeta = JSON.parse(tx.invoiceNotes || tx.invoice_notes || '{}'); } catch (e) { }
+    const refType = bastMeta.refType || 'PO Reference';
+
     // ─────────────────────────────────────────────────
     //  WATERMARK – low-opacity logo in center
     // ─────────────────────────────────────────────────
@@ -812,7 +817,7 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
 
     drawRef('Document No.', tx.docNumber || '-');
     drawRef('Date', fmtDate(tx.date));
-    drawRef('PO Reference', tx.customerPo || '-');
+    drawRef(refType, tx.customerPo || '-');
 
     y += infoBoxH + 8;
 
@@ -820,7 +825,8 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
     doc.setTextColor(...C.DARK);
-    const openingText = `In accordance with Purchase Order ${tx.customerPo ? '"' + tx.customerPo + '"' : '(ref. above)'}, the following items/services have been completed and are hereby handed over for acceptance:`;
+    const refLabel = refType === 'Agreement Reference' ? 'Agreement' : 'Purchase Order';
+    const openingText = `In accordance with ${refLabel} ${tx.customerPo ? '"' + tx.customerPo + '"' : '(ref. above)'}, the following items/services have been completed and are hereby handed over for acceptance:`;
     const openingLines = doc.splitTextToSize(openingText, W);
     doc.text(openingLines, mL, y);
     y += openingLines.length * 4 + 4;
