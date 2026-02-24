@@ -1061,6 +1061,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     const attention = meta.attention || '';
     const doRef = meta.doRef || '';
     const bastRef = meta.bastRef || '';
+    const refType = meta.refType || 'PO Reference';
     const isPaid = (tx.status || '').toLowerCase() === 'paid';
 
     // Logic for conditional references based on item categories
@@ -1198,7 +1199,7 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
 
     drawDocRow('Invoice No.', tx.docNumber || '-', true, true);
     drawDocRow('Invoice Date', fmtDate(tx.date));
-    if (tx.customerPo || tx.customer_po) drawDocRow('PO Reference', tx.customerPo || tx.customer_po);
+    if (tx.customerPo || tx.customer_po) drawDocRow(refType, tx.customerPo || tx.customer_po);
     if (doRef && hasBarang) drawDocRow('DO Reference', doRef);
     if (bastRef && hasService) drawDocRow('BAST Reference', bastRef);
 

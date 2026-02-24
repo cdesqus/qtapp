@@ -1711,7 +1711,13 @@ class UI {
                         <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px;">
                             <div class="form-group"><label>Due Date</label><input type="date" name="dueDate" id="inv-due-date" value="${dueDateStr}" required></div>
                             <div class="form-group"><label>U.P. / Attention (Opsional)</label><input type="text" name="attention" placeholder="Nama PIC klien"></div>
-                            <div class="form-group"><label>PO Reference</label><input type="text" name="customerPo" value="${getPO(tx)}" placeholder="Nomor PO"></div>
+                            <div class="form-group"><label>Reference Type</label>
+                                <select name="refType" style="margin-bottom:6px;">
+                                    <option value="PO Reference">PO Reference</option>
+                                    <option value="Agreement Reference">Agreement Reference</option>
+                                </select>
+                                <input type="text" name="customerPo" value="${getPO(tx)}" placeholder="Nomor Referensi">
+                            </div>
                         </div>
                         <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
                             <div class="form-group">
@@ -1787,7 +1793,7 @@ class UI {
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
                         });
                     });
-                    const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '' };
+                    const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '', refType: fd.get('refType') || 'PO Reference' };
                     const data = {
                         type: 'INV', docNumber: fd.get('docNumber'), customerPo: poVal,
                         date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
