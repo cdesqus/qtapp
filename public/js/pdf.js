@@ -1418,25 +1418,6 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         }
     }
 
-    // ── NOTES ─────────────────────────────────────────────────────
-    doc.setDrawColor(...C.BORDER);
-    doc.setLineWidth(0.3);
-    doc.line(mL, y, pageW - mR, y);
-    y += 5;
-
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.setTextColor(...C.PRIMARY);
-    doc.text('Catatan:', mL, y);
-    y += 4.5;
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
-    doc.setTextColor(...C.SECONDARY);
-    doc.text('1. Mohon lampirkan bukti transfer saat melakukan pembayaran.', mL, y); y += 4;
-    doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
-    if (dueDate) { doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y); y += 4; }
-    y += 4;
-
     // ── CUSTOM NOTE (optional) ───────────────────────────────────
     const customNote = meta.customNote || '';
     if (customNote.trim()) {
@@ -1471,6 +1452,25 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         doc.text(noteLines, mL + 6, y + 2);
         y += noteBlockH + 4;
     }
+
+    // ── NOTES ─────────────────────────────────────────────────────
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.line(mL, y, pageW - mR, y);
+    y += 5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('Catatan:', mL, y);
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('1. Mohon lampirkan bukti transfer saat melakukan pembayaran.', mL, y); y += 4;
+    doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
+    if (dueDate) { doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y); y += 4; }
+    y += 4;
 
     // ── PAYMENT INFORMATION + SIGNATURE (side by side) ────────────
     const payStartY = y;
