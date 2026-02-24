@@ -509,7 +509,7 @@ class UI {
                                             <span style="font-weight:600;color:var(--primary);">${q.docNumber || q.doc_number || '-'}</span><br>
                                             <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(q.date)}</span>
                                         </td>
-                                        <td>${q.clientName || q.client_name || '-'}</td>
+                                        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.clientName || q.client_name || '-'}">${q.clientName || q.client_name || '-'}</td>
                                         <td>
                                             <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);">
                                                 <i class="fa-solid fa-circle-check"></i> ${q.customerPo || q.customer_po}
