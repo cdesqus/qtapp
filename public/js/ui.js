@@ -1063,15 +1063,16 @@ class UI {
                     </div>`;
                 addRowFn = 'addBastItemRow';
             } else {
-                // QUO/INV: Category | Product | Qty | Unit | Price | Margin | Remarks | âœ•
+                // QUO/INV: Category | Product | Qty | Unit | Price | Margin % | Amount | Remarks | ✕
                 itemsHeaderHtml = `
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
                         <span style="${headerStyle}">Unit</span>
                         <span style="${headerStyle}">Price</span>
                         <span style="${headerStyle}">Margin %</span>
+                        <span style="${headerStyle}" title="Amount = Price × (1 + Margin%) × Qty. Bisa diisi langsung sebagai alternatif Margin.">Amount</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                     </div>`;
@@ -1169,11 +1170,21 @@ class UI {
                 } else {
                     document.querySelectorAll('.tx-item-row').forEach(row => {
                         const idx = row.dataset.index;
+                        const priceVal = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value);
+                        const marginVal = row.querySelector(`input[name="items[${idx}][margin]"]`).value;
+                        const amountVal = row.querySelector(`input[name="items[${idx}][amount]"]`) ? row.querySelector(`input[name="items[${idx}][amount]"]`).value : '';
+                        const qtyVal = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value);
+                        // If amount is provided and margin is empty, compute margin from amount
+                        let finalMargin = marginVal !== '' ? Number(marginVal) : 0;
+                        if (amountVal !== '' && marginVal === '' && priceVal > 0 && qtyVal > 0) {
+                            // amount = price * (1 + margin/100) * qty => margin = (amount/(price*qty) - 1) * 100
+                            finalMargin = (Number(amountVal) / (priceVal * qtyVal) - 1) * 100;
+                        }
                         items.push({
                             itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
-                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
-                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`).value),
-                            margin: row.querySelector(`input[name="items[${idx}][margin]"]`).value !== '' ? Number(row.querySelector(`input[name="items[${idx}][margin]"]`).value) : 0,
+                            qty: qtyVal,
+                            price: priceVal,
+                            margin: finalMargin,
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
                             category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
                             unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs'
@@ -1241,7 +1252,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '120px 3fr 80px 80px 140px 90px 2fr 40px';
+        row.style.gridTemplateColumns = '120px 3fr 80px 80px 140px 90px 140px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -1250,6 +1261,14 @@ class UI {
         const activeCat = productCategory || 'Barang';
         const activeUnit = (item ? item.unit : '') || 'Pcs';
         const unitOptions = (window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr']).map(u => `<option value="${u}" ${u === activeUnit ? 'selected' : ''}>${u}</option>`).join('');
+
+        // Compute initial amount if item has margin
+        const initPrice = item ? (item.price || 0) : 0;
+        const initQty = item ? (item.qty || 1) : 1;
+        const initMargin = (item && item.margin != null) ? item.margin : null;
+        const initAmount = (initMargin !== null && initPrice > 0)
+            ? (initPrice * (1 + initMargin / 100) * initQty).toFixed(0)
+            : '';
 
         row.innerHTML = `
             <select name="items[${idx}][category]" onchange="window.ui.onCategoryChange(${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
@@ -1264,12 +1283,21 @@ class UI {
                 <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
-            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
+            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required
+                oninput="window.ui.syncAmountFromMargin(${idx})"
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <select name="items[${idx}][unit]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
                 ${unitOptions}
             </select>
-            <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
-            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" max="100" step="0.5" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
+            <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required
+                oninput="window.ui.syncAmountFromMargin(${idx})"
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
+            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" max="100" step="0.5"
+                oninput="window.ui.syncAmountFromMargin(${idx})"
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
+            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Amount"
+                oninput="window.ui.syncMarginFromAmount(${idx})"
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; background: rgba(99,102,241,0.06);">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
@@ -1282,6 +1310,39 @@ class UI {
                 dropdown.style.display = 'none';
             }
         });
+    }
+
+    // Sync Amount field when Price / Margin / Qty changes
+    syncAmountFromMargin(idx) {
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        if (!row) return;
+        const price = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value) || 0;
+        const margin = row.querySelector(`input[name="items[${idx}][margin]"]`).value;
+        const qty = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value) || 1;
+        const amtEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
+        if (!amtEl) return;
+        if (margin !== '') {
+            amtEl.value = (price * (1 + Number(margin) / 100) * qty).toFixed(0);
+        } else {
+            amtEl.value = '';
+        }
+    }
+
+    // Sync Margin field when Amount changes
+    syncMarginFromAmount(idx) {
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        if (!row) return;
+        const price = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value) || 0;
+        const qty = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value) || 1;
+        const amount = row.querySelector(`input[name="items[${idx}][amount]"]`).value;
+        const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
+        if (!marginEl) return;
+        if (amount !== '' && price > 0 && qty > 0) {
+            const margin = (Number(amount) / (price * qty) - 1) * 100;
+            marginEl.value = margin.toFixed(2);
+        } else {
+            marginEl.value = '';
+        }
     }
 
     onProductSearch(input, idx) {
@@ -1307,8 +1368,16 @@ class UI {
             filtered = filtered.filter(p => p.name.toLowerCase().includes(query));
         }
 
+        const addNewProductBtn = `
+            <div onclick="window.ui.openNewProductFromRow(${idx})" 
+                style="padding: 9px 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border-color); background: rgba(99,102,241,0.06); transition: background 0.15s;"
+                onmouseover="this.style.background='rgba(99,102,241,0.14)'" onmouseout="this.style.background='rgba(99,102,241,0.06)'">
+                <i class="fa-solid fa-plus-circle" style="color: var(--primary); font-size: 0.9rem;"></i>
+                <span style="font-size: 0.85rem; color: var(--primary); font-weight: 600;">Add New Product...</span>
+            </div>`;
+
         if (filtered.length === 0) {
-            dropdown.innerHTML = '<div style="padding: 10px 12px; color: var(--text-secondary); font-size: 0.85rem;">No products found</div>';
+            dropdown.innerHTML = `<div style="padding: 10px 12px; color: var(--text-secondary); font-size: 0.85rem;">No products found</div>${addNewProductBtn}`;
             dropdown.style.display = 'block';
             return;
         }
@@ -1320,8 +1389,69 @@ class UI {
                 <span style="font-size: 0.9rem;">${p.name}</span>
                 <span style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: ${p.category === 'Service' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)'}; color: ${p.category === 'Service' ? '#8b5cf6' : '#0ea5e9'};">${p.category || '-'}</span>
             </div>
-        `).join('');
+        `).join('') + addNewProductBtn;
         dropdown.style.display = 'block';
+    }
+
+    openNewProductFromRow(idx) {
+        // Close any open product dropdown
+        const dropdown = document.getElementById(`product-dropdown-${idx}`);
+        if (dropdown) dropdown.style.display = 'none';
+
+        // Get search text already typed to pre-fill product name
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        const searchVal = row ? (row.querySelector(`input[name="items[${idx}][search]"]`)?.value || '') : '';
+        const catSelect = row?.querySelector(`select[name="items[${idx}][category]"]`);
+        const selectedCat = catSelect?.value || 'Barang';
+
+        const units = window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr'];
+        const unitOptions = units.map(u => `<option value="${u}">${u}</option>`).join('');
+
+        const content = `
+            <h3><i class="fa-solid fa-box-open" style="color:var(--primary);margin-right:8px;"></i>Add New Product</h3>
+            <p style="color:var(--text-secondary);font-size:0.85rem;margin-bottom:16px;">Product baru akan langsung dipilih di baris item setelah disimpan.</p>
+            <form id="quick-product-form">
+                <div class="form-group"><label>Name</label><input type="text" name="name" value="${searchVal.replace(/&/g, '&amp;').replace(/"/g, '&quot;')}" required placeholder="Nama product / service"></div>
+                <div class="form-group"><label>Description</label><textarea name="description" placeholder="Deskripsi (opsional)"></textarea></div>
+                <div class="form-group">
+                    <label>Category</label>
+                    <select name="category">
+                        <option value="Barang" ${selectedCat === 'Barang' ? 'selected' : ''}>Barang</option>
+                        <option value="Service" ${selectedCat === 'Service' ? 'selected' : ''}>Service</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Unit</label>
+                    <select name="unit">${unitOptions}</select>
+                </div>
+                <div class="form-group"><label>Price</label><input type="number" name="price" value="0" required></div>
+                <div style="margin-top:20px;">
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Save &amp; Select</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                </div>
+            </form>
+        `;
+        this.openModal(content);
+        document.getElementById('quick-product-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = {
+                name: formData.get('name'),
+                description: formData.get('description'),
+                category: formData.get('category'),
+                unit: formData.get('unit'),
+                price: Number(formData.get('price'))
+            };
+            try {
+                await window.store.addProduct(data);
+                this.closeModal();
+                // addProduct() already calls loadProducts() internally, products list is now updated
+                const added = (window.store.products || []).find(p => p.name === data.name && p.category === data.category);
+                if (added) {
+                    this.selectProduct(idx, added.id);
+                }
+            } catch (err) { alert('Gagal menyimpan produk: ' + err.message); }
+        };
     }
 
     onCategoryChange(idx) {
