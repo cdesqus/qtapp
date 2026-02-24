@@ -216,11 +216,11 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
             halign: 'center'
         },
         columnStyles: {
-            0: { cellWidth: 12, halign: 'center' },
+            0: { cellWidth: 10, halign: 'center' },
             1: { cellWidth: 'auto' },
-            2: { cellWidth: 20, halign: 'center' },
-            3: { cellWidth: 35, halign: 'right' },
-            4: { cellWidth: 38, halign: 'right' }
+            2: { cellWidth: 15, halign: 'center' },
+            3: { cellWidth: 30, halign: 'right' },
+            4: { cellWidth: 32, halign: 'right' }
         },
         alternateRowStyles: {
             fillColor: PDF_COLORS.LIGHT_BG
@@ -330,7 +330,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     }
 
     // ── SIGNATURE AREA ──
-    y += 5;
+    y += 2;
     const sigLeftX = marginL + 15;
 
     doc.setFont('helvetica', 'normal');

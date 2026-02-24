@@ -968,22 +968,24 @@ class UI {
         const content = `
             <h3>${id ? 'Edit' : 'New'} Product/Service</h3>
             <form id="product-form">
-                <div class="form-group"><label>Name</label><input type="text" name="name" value="${product.name}" required></div>
-                <div class="form-group"><label>Description</label><textarea name="description">${product.description || ''}</textarea></div>
-                <div class="form-group">
-                    <label>Category</label>
-                    <select name="category">
-                        <option value="Barang" ${product.category === 'Barang' ? 'selected' : ''}>Barang</option>
-                        <option value="Service" ${product.category === 'Service' ? 'selected' : ''}>Service</option>
-                    </select>
+                <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;">
+                    <div class="form-group" style="grid-column:1/-1;"><label>Name</label><input type="text" name="name" value="${product.name}" required></div>
+                    <div class="form-group" style="grid-column:1/-1;"><label>Description</label><textarea name="description" rows="4" style="resize:vertical;">${product.description || ''}</textarea></div>
+                    <div class="form-group">
+                        <label>Category</label>
+                        <select name="category">
+                            <option value="Barang" ${product.category === 'Barang' ? 'selected' : ''}>Barang</option>
+                            <option value="Service" ${product.category === 'Service' ? 'selected' : ''}>Service</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Unit</label>
+                        <select name="unit">
+                            ${(window.store.units || []).map(u => `<option value="${u}" ${product.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div class="form-group" style="grid-column:1/-1;"><label>Price</label><input type="number" name="price" value="${product.price}" required></div>
                 </div>
-                <div class="form-group">
-                    <label>Unit</label>
-                    <select name="unit">
-                        ${(window.store.units || []).map(u => `<option value="${u}" ${product.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
-                    </select>
-                </div>
-                <div class="form-group"><label>Price</label><input type="number" name="price" value="${product.price}" required></div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn btn-primary">Save Product</button>
                     <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
