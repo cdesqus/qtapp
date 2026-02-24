@@ -31,17 +31,26 @@ class UI {
             // ── Calc selling price of a transaction ───────────────────────
             const calcTxTotal = (tx) => {
                 return (tx.items || []).reduce((sum, item) => {
-                    const price = Number(item.price || item.cost || 0);
+                    const price = Number(item.price || 0);
+                    const cost = Number(item.cost || 0);
                     const margin = Number(item.margin || 0);
                     const qty = Number(item.qty || 0);
-                    return sum + price * (1 + margin / 100) * qty;
+
+                    if (cost > 0) {
+                        // New system: price column stores the unit selling price
+                        return sum + price * qty;
+                    } else {
+                        // Legacy system: price column stores the cost, apply margin
+                        return sum + price * (1 + margin / 100) * qty;
+                    }
                 }, 0);
             };
             const calcTxCost = (tx) => {
                 return (tx.items || []).reduce((sum, item) => {
-                    const cost = Number(item.price || item.cost || 0);
+                    // Try 'cost' column first, then 'price' (for legacy)
+                    const costVal = Number(item.cost || item.price || 0);
                     const qty = Number(item.qty || 0);
-                    return sum + cost * qty;
+                    return sum + costVal * qty;
                 }, 0);
             };
 
@@ -1170,30 +1179,48 @@ class UI {
                 } else {
                     document.querySelectorAll('.tx-item-row').forEach(row => {
                         const idx = row.dataset.index;
-                        let priceVal = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value);
-                        const marginVal = row.querySelector(`input[name="items[${idx}][margin]"]`).value;
-                        const amountEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
+                        const qtyVal = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value);
+                        const margin_input_val = row.querySelector(`input[name="items[${idx}][margin]"]`)?.value || '';
 
-                        // Clean separators like dots or commas from manual amount
+                        // Handle different schemas (Quotation uses 'price' as cost input, 
+                        // Invoice/others may have a hidden 'cost' field).
+                        const costEl = row.querySelector(`input[name="items[${idx}][cost]"]`);
+                        const priceEl = row.querySelector(`input[name="items[${idx}][price]"]`);
+
+                        let cost_base = 0;
+                        if (costEl) {
+                            cost_base = Number(costEl.value);
+                        } else {
+                            cost_base = Number(priceEl?.value || 0);
+                        }
+
+                        const amountEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
                         const amountRaw = amountEl ? amountEl.value : '';
                         const amountVal = amountRaw.replace(/\./g, '').replace(/,/g, '');
 
-                        const qtyVal = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value);
-
                         let finalMargin = 0;
-                        if (marginVal !== '') {
-                            // Mode: Margin-based (calculate amount from price + margin)
-                            finalMargin = Number(marginVal);
+                        let sellingPricePerUnit = 0;
+
+                        if (margin_input_val !== '') {
+                            finalMargin = Number(margin_input_val);
+                            sellingPricePerUnit = cost_base * (1 + finalMargin / 100);
                         } else if (amountVal !== '' && qtyVal > 0) {
-                            // Mode: Manual Amount (ignore margin, set selling price directly)
-                            priceVal = Number(amountVal) / qtyVal;
+                            sellingPricePerUnit = Number(amountVal) / qtyVal;
+                            finalMargin = 0;
+                        } else if (costEl && priceEl) {
+                            // Scaled row (Invoice)
+                            sellingPricePerUnit = Number(priceEl.value);
+                            finalMargin = Number(margin_input_val) || 0;
+                        } else {
+                            sellingPricePerUnit = cost_base;
                             finalMargin = 0;
                         }
 
                         items.push({
                             itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
                             qty: qtyVal,
-                            price: priceVal,
+                            cost: cost_base,
+                            price: sellingPricePerUnit,
                             margin: finalMargin,
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`).value,
                             category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
@@ -1272,13 +1299,22 @@ class UI {
         const activeUnit = (item ? item.unit : '') || 'Pcs';
         const unitOptions = (window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr']).map(u => `<option value="${u}" ${u === activeUnit ? 'selected' : ''}>${u}</option>`).join('');
 
-        // Compute initial amount if item has margin
+        // Initial values handling (respect dual cost/price schema)
+        const initCost = item ? (item.cost || item.price || 0) : 0;
         const initPrice = item ? (item.price || 0) : 0;
         const initQty = item ? (item.qty || 1) : 1;
         const initMargin = (item && item.margin != null) ? item.margin : null;
-        const initAmount = (initMargin !== null && initPrice > 0)
-            ? (initPrice * (1 + initMargin / 100) * initQty).toFixed(0)
-            : '';
+
+        let initAmount = '';
+        if (item) {
+            if (item.cost && item.price) {
+                // New system: amount is simply price (selling) * qty
+                initAmount = (initPrice * initQty).toFixed(0);
+            } else if (initMargin !== null && initPrice > 0) {
+                // Legacy system: amount calculated from price (cost) + margin
+                initAmount = (initPrice * (1 + initMargin / 100) * initQty).toFixed(0);
+            }
+        }
 
         row.innerHTML = `
             <select name="items[${idx}][category]" onchange="window.ui.onCategoryChange(${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
@@ -1293,13 +1329,13 @@ class UI {
                 <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
-            <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required
+            <input type="number" name="items[${idx}][qty]" value="${initQty}" placeholder="Qty" required
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
             <select name="items[${idx}][unit]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
                 ${unitOptions}
             </select>
-            <input type="number" name="items[${idx}][price]" value="${item ? item.price : 0}" placeholder="Price" required
+            <input type="number" name="items[${idx}][price]" value="${initCost}" placeholder="Price" required
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
@@ -2043,17 +2079,18 @@ class UI {
         let priceVal = 0;
         let marginVal = 0;
         let catVal = 'Barang';
+        let costVal = 0;
         if (item) {
             const pid = item.itemId || item.item_id;
             productId = pid || '';
             unitVal = item.unit || 'Pcs';
             catVal = item.category || 'Barang';
+            costVal = item.cost || item.price || 0;
             const found = pid ? (window.store.products || []).find(p => p.id === pid) : null;
             if (found) {
                 productName = found.name;
-                // Use item's own price/margin if set, otherwise fall back to product defaults
                 priceVal = item.price || found.price || found.cost || 0;
-                marginVal = item.margin || found.margin || 15;
+                marginVal = (item.margin !== undefined) ? item.margin : (found.margin || 15);
             } else {
                 priceVal = item.price || 0;
                 marginVal = item.margin || 0;
@@ -2082,6 +2119,7 @@ class UI {
                 <input type="hidden" name="items[${idx}][itemId]"  value="${productId}">
                 <input type="hidden" name="items[${idx}][price]"   value="${priceVal}">
                 <input type="hidden" name="items[${idx}][margin]"  value="${marginVal}">
+                <input type="hidden" name="items[${idx}][cost]"    value="${costVal}">
                 <div id="product-dropdown-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
             <input type="number" name="items[${idx}][qty]"     value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle}text-align:center;">

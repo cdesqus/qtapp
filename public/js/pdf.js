@@ -166,10 +166,14 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
 
     const tableBody = resolvedItems.map((item, i) => {
-        const basePrice = Number(item.price) || 0;
+        const rawPrice = Number(item.price) || 0;
+        const rawCost = Number(item.cost) || 0;
         const margin = Number(item.margin) || 0;
-        const sellingPrice = basePrice * (1 + margin / 100);
         const qty = Number(item.qty) || 0;
+
+        // If 'cost' is present, 'price' is the final unit selling price.
+        // Otherwise (legacy), calculate from price (cost) and margin.
+        const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
         const amount = sellingPrice * qty;
         // Build description: product name + optional description line + optional remarks
         const namePart = item.resolvedName || '-';
@@ -1203,10 +1207,14 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
             const prod = window.store.products.find(p => p.id === item.itemId);
             if (prod) { name = prod.name; desc = prod.description || ''; }
         }
-        const basePrice = Number(item.price) || 0;
+        const rawPrice = Number(item.price) || 0;
+        const rawCost = Number(item.cost) || 0;
         const margin = Number(item.margin) || 0;
-        const sellingPrice = basePrice * (1 + margin / 100);
         const qty = Number(item.qty) || 0;
+
+        // If 'cost' is present, 'price' is the final unit selling price.
+        // Otherwise (legacy), calculate from price (cost) and margin.
+        const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
         const amount = sellingPrice * qty;
         return { ...item, resolvedName: name, resolvedDesc: desc, sellingPrice, amount };
     });
