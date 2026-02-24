@@ -531,6 +531,12 @@ class UI {
                                                     onclick="window.ui.setInvoiceStatus('${linkedINV.id}','Paid')" title="Tandai Paid">
                                                     <i class="fa-solid fa-circle-check"></i> Paid
                                                    </button>`}
+                                            ${(window.store.currentUser && window.store.currentUser.role === 'admin') ? `
+                                            <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);font-weight:600;"
+                                                onclick="window.ui.editInvoice('${linkedINV.id}')" title="Edit Invoice">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            ` : ''}
                                             ` : ''}
                                         </td>
                                     </tr>
@@ -1542,6 +1548,94 @@ class UI {
             await window.store.updateTransactionStatus(invId, status);
             this.renderInvoiceManagement();
         } catch (err) { alert('Gagal mengubah status: ' + err.message); }
+    }
+
+    async editInvoice(invId) {
+        try {
+            const inv = await window.store.getTransaction(invId);
+            if (!inv) return alert('Invoice tidak ditemukan.');
+
+            let meta = {};
+            try { meta = JSON.parse(inv.invoiceNotes || inv.invoice_notes || '{}'); } catch (e) { }
+            const dueDate = meta.dueDate || '';
+            const attention = meta.attention || '';
+            const doRef = meta.doRef || '';
+            const bastRef = meta.bastRef || '';
+            const refType = meta.refType || 'PO Reference';
+            const poVal = inv.customerPo || inv.customer_po || '';
+            const invoiceDate = inv.date ? inv.date.substring(0, 10) : '';
+
+            const getClientId = t => t.clientId || t.client_id || '';
+            const getDocNum = t => t.docNumber || t.doc_number || '';
+            const clientId = getClientId(inv);
+            const allTx = window.store.transactions || [];
+            const clientDOs = allTx.filter(t => t.type === 'DO' && (t.clientId || t.client_id) === clientId);
+            const clientBASTs = allTx.filter(t => t.type === 'BAP' && (t.clientId || t.client_id) === clientId);
+            const doOpts = clientDOs.map(d => `<option value="${getDocNum(d)}" ${doRef === getDocNum(d) ? 'selected' : ''}>${getDocNum(d)}</option>`).join('');
+            const bastOpts = clientBASTs.map(b => `<option value="${getDocNum(b)}" ${bastRef === getDocNum(b) ? 'selected' : ''}>${getDocNum(b)}</option>`).join('');
+
+            const content = `
+                <h3><i class="fa-solid fa-pen-to-square" style="margin-right:8px;color:var(--primary);"></i>Edit Invoice — ${getDocNum(inv)}</h3>
+                <form id="edit-invoice-form">
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;">
+                        <div class="form-group"><label>Invoice Date</label><input type="date" name="date" value="${invoiceDate}" required></div>
+                        <div class="form-group"><label>Due Date</label><input type="date" name="dueDate" value="${dueDate}" required></div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
+                        <div class="form-group"><label>Reference Type</label>
+                            <select name="refType">
+                                <option value="PO Reference" ${refType === 'PO Reference' ? 'selected' : ''}>PO Reference</option>
+                                <option value="Agreement Reference" ${refType === 'Agreement Reference' ? 'selected' : ''}>Agreement Reference</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Nomor Referensi</label><input type="text" name="customerPo" value="${poVal}" placeholder="Nomor PO / Agreement"></div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
+                        <div class="form-group"><label>U.P. / Attention</label><input type="text" name="attention" value="${attention}" placeholder="Nama PIC klien"></div>
+                        <div class="form-group"><label>Referensi DO</label>
+                            ${doOpts ? `<select name="doRef"><option value="">-- Pilih DO --</option>${doOpts}</select>` : `<input type="text" name="doRef" value="${doRef}" placeholder="No. DO">`}
+                        </div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr;gap:15px;margin-top:15px;">
+                        <div class="form-group"><label>Referensi BAST</label>
+                            ${bastOpts ? `<select name="bastRef"><option value="">-- Pilih BAST --</option>${bastOpts}</select>` : `<input type="text" name="bastRef" value="${bastRef}" placeholder="No. BAST">`}
+                        </div>
+                    </div>
+                    <div style="margin-top:20px;display:flex;gap:10px;">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save" style="margin-right:6px;"></i>Simpan Perubahan</button>
+                        <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Batal</button>
+                    </div>
+                </form>`;
+            this.openModal(content);
+
+            document.getElementById('edit-invoice-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+                const updatedMeta = {
+                    dueDate: fd.get('dueDate'),
+                    attention: fd.get('attention') || '',
+                    doRef: fd.get('doRef') || '',
+                    bastRef: fd.get('bastRef') || '',
+                    refType: fd.get('refType') || 'PO Reference'
+                };
+                const data = {
+                    type: 'INV',
+                    docNumber: getDocNum(inv),
+                    customerPo: fd.get('customerPo') || '',
+                    date: fd.get('date'),
+                    clientId: clientId,
+                    status: inv.status || 'Unpaid',
+                    terms: '',
+                    invoiceNotes: JSON.stringify(updatedMeta),
+                    items: inv.items || []
+                };
+                try {
+                    await window.store.updateTransaction(invId, data, inv.items || []);
+                    this.closeModal();
+                    this.renderInvoiceManagement();
+                } catch (err) { alert('Gagal mengupdate Invoice: ' + err.message); }
+            };
+        } catch (err) { alert('Gagal membuka editor Invoice: ' + err.message); }
     }
 
     async printTransaction(id) {
