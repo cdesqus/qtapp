@@ -213,8 +213,17 @@ th {
     position: sticky;
     top: 0;
     background-color: #f8fafc;
-    /* Subtle grey for header */
+    z-index: 3;
+    box-shadow: inset 0 -1px 0 var(--border-color);
+}
+
+.column-filter-row th {
+    top: 41px;
     z-index: 2;
+    padding: 6px 8px;
+    background-color: #f8fafc;
+    text-transform: none;
+    font-weight: 400;
     box-shadow: inset 0 -1px 0 var(--border-color);
 }
 

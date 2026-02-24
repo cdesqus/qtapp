@@ -742,18 +742,40 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     // ─────────────────────────────────────────────────
     //  REFERENCE INFO GRID
     // ─────────────────────────────────────────────────
+    // Vertical divider
+    const midX = pageW / 2;
+
+    // Left column – Client info (compute content first to determine box height)
+    const clientNameMaxW = midX - mL - 14;
+    const clientNameText = client?.name || tx.clientName || '-';
+
+    // Temporarily set font to measure text
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    const clientNameLines = doc.splitTextToSize(clientNameText, clientNameMaxW);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    let cAddrLines = [];
+    if (client?.address) {
+        cAddrLines = doc.splitTextToSize(client.address, clientNameMaxW);
+    }
+
+    // Calculate left column height: header(7) + gap(5) + name lines + gap(4.5) + address lines + padding(4)
+    const leftContentH = 8 + 5 + (clientNameLines.length * 4.5) + (cAddrLines.length > 0 ? cAddrLines.length * 3.5 : 0) + 4;
+    // Right column: 3 rows × 5.5 + padding = ~24.5
+    const rightContentH = 8 + 3 * 5.5 + 4;
+    const infoBoxH = Math.max(32, leftContentH, rightContentH);
+
     // Draw info box with HUD-style border
-    const infoBoxH = 32;
     doc.setDrawColor(...C.BORDER);
     doc.setLineWidth(0.3);
     doc.roundedRect(mL, y, W, infoBoxH, 2, 2, 'S');
 
-    // Vertical divider
-    const midX = pageW / 2;
     doc.setDrawColor(...C.BORDER);
     doc.line(midX, y + 4, midX, y + infoBoxH - 4);
 
-    // Left column – Client info
+    // Render left column
     let ly = y + 8;
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(7);
@@ -763,14 +785,13 @@ function generateBASTPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...C.DARK);
-    doc.text(client?.name || tx.clientName || '-', mL + 6, ly);
-    ly += 4.5;
+    doc.text(clientNameLines, mL + 6, ly);
+    ly += clientNameLines.length * 4.5;
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8);
     doc.setTextColor(...C.SECONDARY);
-    if (client?.address) {
-        const cAddr = doc.splitTextToSize(client.address, midX - mL - 14);
-        doc.text(cAddr, mL + 6, ly);
+    if (cAddrLines.length > 0) {
+        doc.text(cAddrLines, mL + 6, ly);
     }
 
     // Right column – Document info
