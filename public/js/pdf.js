@@ -323,7 +323,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     }
 
     // ── Check page break ──
-    const neededSpace = 55;
+    const neededSpace = 35;
     if (y + neededSpace > doc.internal.pageSize.getHeight() - 10) {
         doc.addPage();
         y = 20;
