@@ -1170,18 +1170,26 @@ class UI {
                 } else {
                     document.querySelectorAll('.tx-item-row').forEach(row => {
                         const idx = row.dataset.index;
-                        const priceVal = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value);
+                        let priceVal = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value);
                         const marginVal = row.querySelector(`input[name="items[${idx}][margin]"]`).value;
-                        const amountVal = row.querySelector(`input[name="items[${idx}][amount]"]`) ? row.querySelector(`input[name="items[${idx}][amount]"]`).value : '';
+                        const amountEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
+
+                        // Clean separators like dots or commas from manual amount
+                        const amountRaw = amountEl ? amountEl.value : '';
+                        const amountVal = amountRaw.replace(/\./g, '').replace(/,/g, '');
+
                         const qtyVal = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value);
 
                         let finalMargin = 0;
                         if (marginVal !== '') {
+                            // Mode: Margin-based (calculate amount from price + margin)
                             finalMargin = Number(marginVal);
-                        } else if (amountVal !== '' && priceVal > 0 && qtyVal > 0) {
-                            // Prioritize manual Amount by calculating required margin
-                            finalMargin = (Number(amountVal) / (priceVal * qtyVal) - 1) * 100;
+                        } else if (amountVal !== '' && qtyVal > 0) {
+                            // Mode: Manual Amount (ignore margin, set selling price directly)
+                            priceVal = Number(amountVal) / qtyVal;
+                            finalMargin = 0;
                         }
+
                         items.push({
                             itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
                             qty: qtyVal,
@@ -1297,7 +1305,7 @@ class UI {
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
-            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Amount"
+            <input type="text" name="items[${idx}][amount]" value="${initAmount}" placeholder="Amount"
                 oninput="window.ui.syncMarginFromAmount(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; background: rgba(99,102,241,0.06);">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
@@ -1325,9 +1333,8 @@ class UI {
         if (!amtEl) return;
         if (margin !== '') {
             amtEl.value = (price * (1 + Number(margin) / 100) * qty).toFixed(0);
-        } else {
-            amtEl.value = '';
         }
+        // If margin is blank, we don't touch the amount field (Manual Mode)
     }
 
     // Sync Margin field when Amount changes (Manual Amount Mode)
