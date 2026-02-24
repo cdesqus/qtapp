@@ -166,7 +166,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         return { ...item, resolvedName: name, resolvedDesc: desc };
     });
 
-    const tableHeaders = [['No.', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
+    const tableHeaders = [['No', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
 
     const tableBody = resolvedItems.map((item, i) => {
         const rawPrice = Number(item.price) || 0;
