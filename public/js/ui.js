@@ -1623,6 +1623,7 @@ class UI {
             const doRef = meta.doRef || '';
             const bastRef = meta.bastRef || '';
             const refType = meta.refType || 'PO Reference';
+            const customNote = meta.customNote || '';
             const poVal = inv.customerPo || inv.customer_po || '';
             const invoiceDate = inv.date ? inv.date.substring(0, 10) : '';
 
@@ -1662,6 +1663,10 @@ class UI {
                             ${bastOpts ? `<select name="bastRef"><option value="">-- Pilih BAST --</option>${bastOpts}</select>` : `<input type="text" name="bastRef" value="${bastRef}" placeholder="No. BAST">`}
                         </div>
                     </div>
+                    <div class="form-group" style="margin-top:15px;">
+                        <label>Catatan Tambahan <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;">(opsional, tampil di PDF)</span></label>
+                        <textarea name="customNote" rows="3" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.5; resize: vertical;" placeholder="Tulis catatan tambahan yang akan ditampilkan di PDF invoice...">${customNote}</textarea>
+                    </div>
                     <div style="margin-top:20px;display:flex;gap:10px;">
                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save" style="margin-right:6px;"></i>Simpan Perubahan</button>
                         <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Batal</button>
@@ -1677,7 +1682,8 @@ class UI {
                     attention: fd.get('attention') || '',
                     doRef: fd.get('doRef') || '',
                     bastRef: fd.get('bastRef') || '',
-                    refType: fd.get('refType') || 'PO Reference'
+                    refType: fd.get('refType') || 'PO Reference',
+                    customNote: fd.get('customNote') || ''
                 };
                 const data = {
                     type: 'INV',
@@ -1896,6 +1902,10 @@ class UI {
                                            <input type="hidden" name="bastRef" value=""></div>`}
                             </div>
                         </div>
+                        <div class="form-group" style="margin-top:15px;">
+                            <label>Catatan Tambahan <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;">(opsional, tampil di PDF)</span></label>
+                            <textarea name="customNote" rows="3" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.5; resize: vertical;" placeholder="Tulis catatan tambahan yang akan ditampilkan di PDF invoice..."></textarea>
+                        </div>
                         <h4 style="margin-top:20px;margin-bottom:10px;">Items</h4>
                         ${itemsHeader}
                         <div id="tx-items-container"></div>
@@ -1948,7 +1958,7 @@ class UI {
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
                         });
                     });
-                    const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '', refType: fd.get('refType') || 'PO Reference' };
+                    const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '', refType: fd.get('refType') || 'PO Reference', customNote: fd.get('customNote') || '' };
                     const data = {
                         type: 'INV', docNumber: fd.get('docNumber'), customerPo: poVal,
                         date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',

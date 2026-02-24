@@ -1437,6 +1437,41 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     if (dueDate) { doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y); y += 4; }
     y += 4;
 
+    // ── CUSTOM NOTE (optional) ───────────────────────────────────
+    const customNote = meta.customNote || '';
+    if (customNote.trim()) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.DARK);
+        const noteLines = doc.splitTextToSize(customNote, W);
+        const noteBlockH = noteLines.length * 4 + 6;
+
+        // Page check
+        if (y + noteBlockH > pageH - 80) {
+            doc.addPage();
+            y = 25;
+            if (isPaid) {
+                doc.saveGraphicsState();
+                doc.setGState(new doc.GState({ opacity: 0.12 }));
+                doc.setFont('helvetica', 'bold'); doc.setFontSize(88); doc.setTextColor(...C.GREEN);
+                doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+                doc.restoreGraphicsState();
+            }
+        }
+
+        // Subtle background box
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(mL, y - 2, W, noteBlockH, 1.5, 1.5, 'F');
+        doc.setFillColor(...C.PRIMARY);
+        doc.rect(mL, y - 2, 2, noteBlockH, 'F');
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.DARK);
+        doc.text(noteLines, mL + 6, y + 2);
+        y += noteBlockH + 4;
+    }
+
     // ── PAYMENT INFORMATION + SIGNATURE (side by side) ────────────
     const payStartY = y;
 
