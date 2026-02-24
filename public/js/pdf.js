@@ -238,10 +238,12 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     // ── TOTALS ──────────────────────────
     let subtotal = 0;
     resolvedItems.forEach(item => {
-        const basePrice = Number(item.price) || 0;
+        const rawPrice = Number(item.price) || 0;
+        const rawCost = Number(item.cost) || 0;
         const margin = Number(item.margin) || 0;
-        const sellingPrice = basePrice * (1 + margin / 100);
-        subtotal += sellingPrice * (Number(item.qty) || 0);
+        const qty = Number(item.qty) || 0;
+        const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+        subtotal += sellingPrice * qty;
     });
 
     const totalsX = pageW - marginR - 75;
