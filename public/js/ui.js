@@ -233,6 +233,38 @@ class UI {
         });
     }
 
+    filterTableByColumns(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        const filterRow = table.querySelector('.column-filter-row');
+        if (!filterRow) return;
+        const filters = Array.from(filterRow.querySelectorAll('input, select')).map(el => (el.value || '').toLowerCase().trim());
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            let show = true;
+            filters.forEach((f, i) => {
+                if (f && cells[i]) {
+                    const cellText = cells[i].textContent.toLowerCase();
+                    if (!cellText.includes(f)) show = false;
+                }
+            });
+            row.style.display = show ? '' : 'none';
+        });
+    }
+
+    _buildFilterRow(tableId, colCount, skipCols = []) {
+        const inputStyle = 'padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;font-size:0.75rem;width:100%;background:var(--card-bg);color:var(--text-primary);';
+        let cells = '';
+        for (let i = 0; i < colCount; i++) {
+            if (skipCols.includes(i)) {
+                cells += '<th></th>';
+            } else {
+                cells += `<th><input type="text" placeholder="Filter..." style="${inputStyle}" oninput="window.ui.filterTableByColumns('${tableId}')"></th>`;
+            }
+        }
+        return `<tr class="column-filter-row" style="background:#f8fafc;">${cells}</tr>`;
+    }
+
     renderClients() {
         try {
             const container = document.getElementById('content-area');
@@ -348,6 +380,7 @@ class UI {
                         <table id="${tableId}">
                             <thead>
                                 <tr><th>Date</th><th>Number</th>${showPO ? '<th>PO Number</th>' : ''}${isQuo ? '<th>Project</th>' : ''}<th>Client</th><th>Status</th><th>Actions</th></tr>
+                                ${this._buildFilterRow(tableId, colCount, [colCount - 1])}
                             </thead>
                             <tbody>
                                 ${txs.length === 0 ? `<tr><td colspan="${colCount}" style="text-align:center">No ${label} found</td></tr>` :
@@ -465,6 +498,7 @@ class UI {
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
+                                ${this._buildFilterRow('inv-table', 12, [11])}
                             </thead>
                             <tbody>
                                 ${rows.length === 0
