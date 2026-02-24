@@ -166,7 +166,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         return { ...item, resolvedName: name, resolvedDesc: desc };
     });
 
-    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
+    const tableHeaders = [['No.', 'DESCRIPTION', 'QTY', 'UNIT PRICE', 'AMOUNT']];
 
     const tableBody = resolvedItems.map((item, i) => {
         const rawPrice = Number(item.price) || 0;
@@ -319,7 +319,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
             y += lineH;
         });
 
-        y += 1;
+        y += 6;
     }
 
     // ── Check page break ──
@@ -347,7 +347,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         } catch (e) { }
     }
 
-    y += 30;
+    y += 35;
 
     // Signature line
     doc.setDrawColor(...PDF_COLORS.BORDER);
