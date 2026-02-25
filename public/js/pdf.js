@@ -176,8 +176,8 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
         // If 'cost' is present, 'price' is the final unit selling price.
         // Otherwise (legacy), calculate from price (cost) and margin.
-        const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
-        const amount = sellingPrice * qty;
+        const sellingPrice = Math.round((rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100)));
+        const amount = Math.round(sellingPrice * qty);
         // Build description: product name + optional description line + optional remarks
         const namePart = item.resolvedName || '-';
         const descPart = item.resolvedDesc ? `\n${item.resolvedDesc}` : '';
@@ -242,8 +242,8 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         const rawCost = Number(item.cost) || 0;
         const margin = Number(item.margin) || 0;
         const qty = Number(item.qty) || 0;
-        const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
-        subtotal += sellingPrice * qty;
+        const sellingPrice = Math.round((rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100)));
+        subtotal += Math.round(sellingPrice * qty);
     });
 
     const totalsX = pageW - marginR - 75;
@@ -272,7 +272,7 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
     drawTotalRow('Subtotal', fmtCurrency(subtotal));
 
     // PPN
-    const ppn = subtotal * 0.11;
+    const ppn = Math.round(subtotal * 0.11);
     drawTotalRow('PPN', fmtCurrency(ppn));
 
     y += 1;
