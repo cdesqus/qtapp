@@ -32,32 +32,24 @@ class UI {
             const calcTxTotal = (tx) => {
                 const rate = tx.currency === 'USD' ? 16200 : 1;
                 return (tx.items || []).reduce((sum, item) => {
-                    const price = Number(item.price || 0);
-                    const cost = Number(item.cost || 0);
+                    const rawPrice = Number(item.price || 0);
+                    const rawCost = Number(item.cost || 0);
                     const margin = Number(item.margin || 0);
                     const qty = Number(item.qty || 0);
 
-                    // New system check: has cost property, or cost > 0, or is generated recently
-                    const isNew = item.hasOwnProperty('cost') || cost > 0 || (new Date(tx.date) >= new Date('2024-01-01') && !('cost' in item));
-
-                    if (isNew) {
-                        return sum + (price * qty * rate);
-                    } else {
-                        return sum + (price * (1 + margin / 100) * qty * rate);
-                    }
+                    const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+                    return sum + (sellingPrice * qty * rate);
                 }, 0);
             };
             const calcTxCost = (tx) => {
                 const rate = tx.currency === 'USD' ? 16200 : 1;
                 return (tx.items || []).reduce((sum, item) => {
-                    const cost = Number(item.cost || 0);
-                    const isNew = item.hasOwnProperty('cost') || cost > 0 || (new Date(tx.date) >= new Date('2024-01-01') && !('cost' in item));
+                    const rawPrice = Number(item.price || 0);
+                    const rawCost = Number(item.cost || 0);
+                    const qty = Number(item.qty || 0);
 
-                    if (isNew) {
-                        return sum + (cost * Number(item.qty || 0) * rate);
-                    } else {
-                        return sum + (Number(item.price || 0) * Number(item.qty || 0) * rate);
-                    }
+                    const costPrice = (rawCost > 0) ? rawCost : rawPrice;
+                    return sum + (costPrice * qty * rate);
                 }, 0);
             };
 
