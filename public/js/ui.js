@@ -1674,16 +1674,49 @@ class UI {
                         <label>Catatan Tambahan <span style="font-weight:normal;color:var(--text-secondary);font-size:0.8rem;">(opsional, tampil di PDF)</span></label>
                         <textarea name="customNote" rows="3" style="width:100%; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; line-height: 1.5; resize: vertical;" placeholder="Tulis catatan tambahan yang akan ditampilkan di PDF invoice...">${customNote}</textarea>
                     </div>
+                    
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Items</h4>
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Category</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Product</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Qty</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Price</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Unit</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Remarks</span>
+                        <span></span>
+                    </div>
+                    <div id="tx-items-container"></div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addInvItemRow()" style="margin-top: 10px;">+ Add Item</button>
+
                     <div style="margin-top:20px;display:flex;gap:10px;">
                         <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save" style="margin-right:6px;"></i>Simpan Perubahan</button>
                         <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Batal</button>
                     </div>
                 </form>`;
             this.openModal(content);
+            this.currentItemIndex = 0;
+            if (inv.items && inv.items.length > 0) inv.items.forEach(item => this.addInvItemRow(item));
+            else this.addInvItemRow();
 
             document.getElementById('edit-invoice-form').onsubmit = async (e) => {
                 e.preventDefault();
                 const fd = new FormData(e.target);
+                // Collect items from the form
+                const items = [];
+                document.querySelectorAll('#tx-items-container .tx-item-row').forEach(row => {
+                    const idx = row.dataset.index;
+                    items.push({
+                        itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                        qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                        remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
+                        category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                        unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
+                        price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                        margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
+                        cost: Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0,
+                    });
+                });
+
                 const updatedMeta = {
                     dueDate: fd.get('dueDate'),
                     attention: fd.get('attention') || '',
@@ -1701,10 +1734,10 @@ class UI {
                     status: inv.status || 'Unpaid',
                     terms: '',
                     invoiceNotes: JSON.stringify(updatedMeta),
-                    items: inv.items || []
+                    items: items
                 };
                 try {
-                    await window.store.updateTransaction(invId, data, inv.items || []);
+                    await window.store.updateTransaction(invId, data, items);
                     this.closeModal();
                     this.renderInvoiceManagement();
                 } catch (err) { alert('Gagal mengupdate Invoice: ' + err.message); }
@@ -1858,10 +1891,10 @@ class UI {
                 const bastOptions = clientBASTs.map(b => `<option value="${getDocNum(b)}"   ${autoMatchBAST && getDocNum(b) === getDocNum(autoMatchBAST) ? 'selected' : ''}>${getDocNum(b)}</option>`).join('');
 
                 const hdrS = 'font-weight:600;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;';
-                // Items header: NO Price, NO Margin
-                const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 80px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
+                // Items header: WITH Price
+                const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 140px 80px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
                     <span style="${hdrS}">Category</span><span style="${hdrS}">Product</span><span style="${hdrS}">Qty</span>
-                    <span style="${hdrS}">Unit</span><span style="${hdrS}">Remarks</span><span></span></div>`;
+                    <span style="${hdrS}">Price</span><span style="${hdrS}">Unit</span><span style="${hdrS}">Remarks</span><span></span></div>`;
 
                 const content = `
                     <h3>New Invoice (from Quotation)</h3>
@@ -2302,7 +2335,7 @@ class UI {
 
         const row = document.createElement('div');
         row.className = 'tx-item-row';
-        row.style.cssText = 'display:grid;grid-template-columns:120px 3fr 80px 80px 2fr 40px;gap:10px;margin-bottom:8px;align-items:center;';
+        row.style.cssText = 'display:grid;grid-template-columns:120px 3fr 80px 140px 80px 2fr 40px;gap:10px;margin-bottom:8px;align-items:center;';
         row.dataset.index = idx;
 
         const inputStyle = 'width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.9rem;';
@@ -2317,7 +2350,7 @@ class UI {
                     onfocus="window.ui.onProductSearch(this,${idx})"
                     style="${inputStyle}">
                 <input type="hidden" name="items[${idx}][itemId]"  value="${productId}">
-                <input type="hidden" name="items[${idx}][price]"   value="${priceVal}">
+                <input type="number" name="items[${idx}][price]"   value="${priceVal}" placeholder="Price" style="${inputStyle}text-align:right;">
                 <input type="hidden" name="items[${idx}][margin]"  value="${marginVal}">
                 <input type="hidden" name="items[${idx}][cost]"    value="${costVal}">
                 <div id="product-dropdown-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
