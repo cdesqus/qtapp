@@ -85,6 +85,19 @@ pool.connect(async (err, client, release) => {
             await client.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS full_name VARCHAR(255)');
             await client.query('ALTER TABLE transactions ADD COLUMN IF NOT EXISTS project_name TEXT');
             await client.query('ALTER TABLE clients ADD COLUMN IF NOT EXISTS pic TEXT');
+
+            // Currency functionality migration
+            await client.query(`
+                CREATE TABLE IF NOT EXISTS currencies (
+                    code TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    symbol TEXT NOT NULL
+                );
+            `);
+            await client.query(`INSERT INTO currencies (code, name, symbol) VALUES ('IDR', 'Rupiah', 'Rp'), ('USD', 'US Dollar', '$') ON CONFLICT DO NOTHING;`);
+            await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS currency TEXT REFERENCES currencies(code) DEFAULT 'IDR';`);
+            await client.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS currency TEXT REFERENCES currencies(code) DEFAULT 'IDR';`);
+
             console.log('✅ Database migrations applied');
         } catch (e) { console.error('Migration warning:', e.message); }
         release();
@@ -200,6 +213,13 @@ app.get('/api/units', authenticate, async (req, res) => {
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/currencies', authenticate, async (req, res) => {
+    try {
+        const result = await pool.query('SELECT * FROM currencies ORDER BY code');
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.post('/api/units', authenticate, async (req, res) => {
     try {
         await pool.query('INSERT INTO units (name) VALUES ($1) ON CONFLICT DO NOTHING', [req.body.name]);
@@ -281,25 +301,24 @@ app.get('/api/products', authenticate, async (req, res) => {
 });
 
 app.post('/api/products', authenticate, async (req, res) => {
-    const { name, description, category, unit, price } = req.body;
+    const { name, description, category, unit, price, currency } = req.body;
     try {
         const result = await pool.query(
-            'INSERT INTO products (name, description, category, unit, price) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [name, description, category, unit, price]
+            'INSERT INTO products (name, description, category, unit, price, currency) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, description, category, unit, price, currency || 'IDR']
         );
         sendJson(res, result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 app.put('/api/products/:id', authenticate, async (req, res) => {
-    const { id } = req.params;
-    const { name, description, category, unit, price } = req.body;
+    const { name, description, category, unit, price, currency } = req.body;
     try {
-        await pool.query(
-            'UPDATE products SET name=$1, description=$2, category=$3, unit=$4, price=$5 WHERE id=$6',
-            [name, description, category, unit, price, id]
+        const result = await pool.query(
+            'UPDATE products SET name = $1, description = $2, category = $3, unit = $4, price = $5, currency = $6 WHERE id = $7 RETURNING *',
+            [name, description, category, unit, price, currency || 'IDR', req.params.id]
         );
-        res.json({ success: true });
+        sendJson(res, result.rows[0]);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
@@ -392,7 +411,7 @@ app.post('/api/transactions', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { type, docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, projectName } = req.body;
+        const { type, docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, projectName, currency } = req.body;
 
         // Check duplicate PO number — for DO and BAP (BAST) types
         if ((type === 'DO' || type === 'BAP') && customerPo) {
@@ -410,8 +429,8 @@ app.post('/api/transactions', authenticate, async (req, res) => {
         while (attempt < 10) {
             try {
                 const txResult = await client.query(
-                    'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes, project_name) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
-                    [type, finalDocNumber, customerPo, date, clientId, terms, status, invoiceNotes || null, projectName || null]
+                    'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes, project_name, currency) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
+                    [type, finalDocNumber, customerPo, date, clientId, terms, status, invoiceNotes || null, projectName || null, currency || 'IDR']
                 );
                 const txId = txResult.rows[0].id;
                 for (const item of items) {
@@ -483,7 +502,7 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
     const client = await pool.connect();
     try {
         await client.query('BEGIN');
-        const { docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, signature, projectName } = req.body;
+        const { docNumber, customerPo, date, clientId, terms, status, items, invoiceNotes, signature, projectName, currency } = req.body;
 
         // Check duplicate PO number — for DO and BAP (BAST) types
         const existingTx = await client.query('SELECT type FROM transactions WHERE id = $1', [id]);
@@ -498,8 +517,8 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
         }
 
         await client.query(
-            'UPDATE transactions SET doc_number=$1, customer_po=$2, date=$3, terms=$4, status=$5, invoice_notes=$6, signature=$7, project_name=$8 WHERE id=$9',
-            [docNumber, customerPo, date, terms, status, invoiceNotes, signature, projectName || null, id]
+            'UPDATE transactions SET doc_number = $1, customer_po = $2, date = $3, client_id = $4, terms = $5, status = $6, invoice_notes = $7, signature = $8, project_name = $9, currency = $10 WHERE id = $11',
+            [docNumber, customerPo, date, clientId, terms, status, invoiceNotes || null, signature || null, projectName || null, currency || 'IDR', id]
         );
 
         await client.query('DELETE FROM transaction_items WHERE transaction_id = $1', [id]);

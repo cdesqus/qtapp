@@ -1155,7 +1155,13 @@ class UI {
                             ${(window.store.units || []).map(u => `<option value="${u}" ${product.unit === u ? 'selected' : ''}>${u}</option>`).join('')}
                         </select>
                     </div>
-                    <div class="form-group" style="grid-column:1/-1;"><label>Price</label><input type="number" name="price" value="${product.price}" required></div>
+                    <div class="form-group"><label>Price</label><input type="number" name="price" value="${product.price}" required></div>
+                    <div class="form-group">
+                        <label>Currency</label>
+                        <select name="currency">
+                            ${(window.store.currencies || [{ code: 'IDR', name: 'Rupiah' }, { code: 'USD', name: 'US Dollar' }]).map(c => `<option value="${c.code}" ${product.currency === c.code ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
+                        </select>
+                    </div>
                 </div>
                 <div style="margin-top: 20px;">
                     <button type="submit" class="btn btn-primary">Save Product</button>
@@ -1172,7 +1178,8 @@ class UI {
                 description: formData.get('description'),
                 category: formData.get('category'),
                 unit: formData.get('unit'),
-                price: Number(formData.get('price'))
+                price: Number(formData.get('price')),
+                currency: formData.get('currency') || 'IDR'
             };
             try {
                 if (id) await window.store.updateProduct(id, data);
@@ -1285,7 +1292,7 @@ class UI {
             const content = `
                 <h3>${id ? 'Edit' : 'New'} ${this.typeLabel(type)}</h3>
                 <form id="transaction-form">
-                    <div class="grid" style="grid-template-columns: 1fr 1fr 1fr; gap: 15px;">
+                    <div class="grid" style="grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px;">
                         <div class="form-group"><label>Doc Number</label><input type="text" id="tx-doc-number" name="docNumber" value="${tx.docNumber}" required ${!id ? 'readonly style="background:#f1f5f9; cursor:not-allowed;"' : ''}></div>
                         <div class="form-group"><label>Date</label><input type="date" id="tx-date" name="date" value="${tx.date.split('T')[0]}" required ${!id ? `onchange="window.ui.refreshDocNumber('${type}', this.value)"` : ''}></div>
                         <div class="form-group">
@@ -1293,6 +1300,12 @@ class UI {
                             <select name="clientId" required>
                                 <option value="">Select Client</option>
                                 ${window.store.clients.map(c => `<option value="${c.id}" ${tx.clientId === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select name="currency" required>
+                                ${(window.store.currencies || [{ code: 'IDR', name: 'Rupiah' }, { code: 'USD', name: 'US Dollar' }]).map(c => `<option value="${c.code}" ${tx.currency === c.code ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
                             </select>
                         </div>
                     </div>
@@ -1463,6 +1476,7 @@ class UI {
                     terms: termsText,
                     projectName: formData.get('projectName') || '',
                     invoiceNotes: invoiceNotes || undefined,
+                    currency: formData.get('currency') || 'IDR',
                     items
                 };
 
@@ -1633,9 +1647,12 @@ class UI {
 
         dropdown.innerHTML = filtered.map(p => `
             <div class="product-search-option" onclick="window.ui.selectProduct(${idx}, '${p.id}')"
-                style="padding: 8px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
+                style="padding: 10px 12px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); transition: background 0.15s;"
                 onmouseover="this.style.background='var(--bg-color)'" onmouseout="this.style.background='transparent'">
-                <span style="font-size: 0.9rem;">${p.name}</span>
+                <div style="display: flex; flex-direction: column; gap: 2px;">
+                    <span style="font-size: 0.9rem; font-weight: 500;">${p.name}</span>
+                    <span style="font-size: 0.75rem; color: var(--text-secondary);">${p.currency || 'IDR'} ${Number(p.price || 0).toLocaleString()}</span>
+                </div>
                 <span style="font-size: 0.75rem; padding: 2px 8px; border-radius: 4px; background: ${p.category === 'Service' ? 'rgba(139,92,246,0.15)' : 'rgba(14,165,233,0.15)'}; color: ${p.category === 'Service' ? '#8b5cf6' : '#0ea5e9'};">${p.category || '-'}</span>
             </div>
         `).join('') + addNewProductBtn;
@@ -1730,6 +1747,19 @@ class UI {
             catSelect.value = product.category;
         }
 
+        // Auto-set unit
+        const unitSelect = row.querySelector(`select[name="items[${idx}][unit]"]`);
+        if (unitSelect && product.unit) {
+            unitSelect.value = product.unit;
+        }
+
+        // Currency mismatch warning
+        const txCurrencySelect = document.querySelector('select[name="currency"]');
+        if (txCurrencySelect && product.currency && txCurrencySelect.value !== product.currency) {
+            console.warn(`Currency mismatch: Product is ${product.currency}, Transaction is ${txCurrencySelect.value}`);
+            // Optionally could add a UI notice here, but for now just console warning is safer
+        }
+
         // Close dropdown
         const dropdown = document.getElementById(`product-dropdown-${idx}`);
         if (dropdown) dropdown.style.display = 'none';
@@ -1811,11 +1841,17 @@ class UI {
                     </div>
                     <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
                         <div class="form-group"><label>U.P. / Attention</label><input type="text" name="attention" value="${attention}" placeholder="Nama PIC klien"></div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select name="currency" required>
+                                ${(window.store.currencies || [{ code: 'IDR', name: 'Rupiah' }, { code: 'USD', name: 'US Dollar' }]).map(c => `<option value="${c.code}" ${inv.currency === c.code ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
                         <div class="form-group"><label>Referensi DO</label>
                             ${doOpts ? `<select name="doRef"><option value="">-- Pilih DO --</option>${doOpts}</select>` : `<input type="text" name="doRef" value="${doRef}" placeholder="No. DO">`}
                         </div>
-                    </div>
-                    <div class="grid" style="grid-template-columns:1fr;gap:15px;margin-top:15px;">
                         <div class="form-group"><label>Referensi BAST</label>
                             ${bastOpts ? `<select name="bastRef"><option value="">-- Pilih BAST --</option>${bastOpts}</select>` : `<input type="text" name="bastRef" value="${bastRef}" placeholder="No. BAST">`}
                         </div>
@@ -1884,7 +1920,8 @@ class UI {
                     status: inv.status || 'Unpaid',
                     terms: '',
                     invoiceNotes: JSON.stringify(updatedMeta),
-                    items: items
+                    items: items,
+                    currency: fd.get('currency') || 'IDR'
                 };
                 try {
                     await window.store.updateTransaction(invId, data, items);
@@ -1931,8 +1968,14 @@ class UI {
                         </div>
                         <div class="form-group"><label>Nomor Referensi</label><input type="text" name="customerPo" value="${poVal}" placeholder="Nomor PO / Agreement"></div>
                     </div>
-                    <div class="grid" style="grid-template-columns:1fr;gap:15px;margin-top:15px;">
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
                         <div class="form-group"><label>U.P. / Attention</label><input type="text" name="attention" value="${attention}" placeholder="Nama PIC klien"></div>
+                        <div class="form-group">
+                            <label>Currency</label>
+                            <select name="currency" required>
+                                ${(window.store.currencies || [{ code: 'IDR', name: 'Rupiah' }, { code: 'USD', name: 'US Dollar' }]).map(c => `<option value="${c.code}" ${pi.currency === c.code ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
+                            </select>
+                        </div>
                     </div>
                     
                     <h4 style="margin-top: 25px; margin-bottom: 10px;">Items</h4>
@@ -1983,7 +2026,8 @@ class UI {
                     status: pi.status || 'Unpaid',
                     terms: '',
                     invoiceNotes: JSON.stringify(updatedMeta),
-                    items: items
+                    items: items,
+                    currency: fd.get('currency') || 'IDR'
                 };
                 try {
                     await window.store.updateTransaction(piId, data, items);
@@ -2135,13 +2179,19 @@ class UI {
                 const content = `
                     <h3>New Proforma Invoice (from Quotation)</h3>
                     <form id="transaction-form-pi">
-                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;">
+                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:15px;">
                             <div class="form-group"><label>Proforma Invoice Number</label><input type="text" name="docNumber" value="${window.store.generateNextDocNumber('PI')}" required readonly style="background:#f1f5f9;cursor:not-allowed;"></div>
                             <div class="form-group"><label>Invoice Date</label><input type="date" name="date" id="pi-date" value="${invoiceDate}" required></div>
                             <div class="form-group"><label>Client</label>
                                 <select name="clientId" required>
                                     <option value="">Select Client</option>
                                     ${window.store.clients.map(c => `<option value="${c.id}" ${getClientId(tx) === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Currency</label>
+                                <select name="currency" required>
+                                    ${(window.store.currencies || [{ code: 'IDR', name: 'Rupiah' }, { code: 'USD', name: 'US Dollar' }]).map(c => `<option value="${c.code}" ${tx.currency === c.code ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
                                 </select>
                             </div>
                         </div>
@@ -2207,7 +2257,7 @@ class UI {
                     const data = {
                         type: 'PI', docNumber: fd.get('docNumber'), customerPo: poVal,
                         date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
-                        invoiceNotes: JSON.stringify(invMeta), items
+                        invoiceNotes: JSON.stringify(invMeta), items, currency: fd.get('currency') || 'IDR'
                     };
                     try {
                         await window.store.addTransaction(data, items);
@@ -2251,13 +2301,19 @@ class UI {
                 const content = `
                     <h3>New Invoice (from Quotation)</h3>
                     <form id="transaction-form">
-                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;">
+                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:15px;">
                             <div class="form-group"><label>Invoice Number</label><input type="text" name="docNumber" value="${window.store.generateNextDocNumber('INV')}" required readonly style="background:#f1f5f9;cursor:not-allowed;"></div>
                             <div class="form-group"><label>Invoice Date</label><input type="date" name="date" id="inv-date" value="${invoiceDate}" required></div>
                             <div class="form-group"><label>Client</label>
                                 <select name="clientId" required>
                                     <option value="">Select Client</option>
                                     ${window.store.clients.map(c => `<option value="${c.id}" ${getClientId(tx) === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Currency</label>
+                                <select name="currency" required>
+                                    ${(window.store.currencies || [{ code: 'IDR', name: 'Rupiah' }, { code: 'USD', name: 'US Dollar' }]).map(c => `<option value="${c.code}" ${tx.currency === c.code ? 'selected' : ''}>${c.code} - ${c.name}</option>`).join('')}
                                 </select>
                             </div>
                         </div>

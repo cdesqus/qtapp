@@ -15,9 +15,12 @@ const PDF_COLORS = {
 // ────────────────────────────────────
 //  Helpers
 // ────────────────────────────────────
-const fmtCurrency = (v) => {
+const fmtCurrency = (v, currencyCode = 'IDR') => {
     const n = Number(v) || 0;
-    return 'Rp ' + n.toLocaleString('id-ID', { minimumFractionDigits: 0 });
+    if (currencyCode === 'USD') {
+        return '$ ' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    return 'Rp ' + Math.round(n).toLocaleString('id-ID', { minimumFractionDigits: 0 });
 };
 
 const fmtDate = (d) => {
@@ -178,8 +181,14 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
 
         // If 'cost' is present, 'price' is the final unit selling price.
         // Otherwise (legacy), calculate from price (cost) and margin.
-        const sellingPrice = Math.round((rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100)));
-        const amount = Math.round(sellingPrice * qty);
+        let sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+        let amount = sellingPrice * qty;
+
+        if (tx.currency !== 'USD') {
+            sellingPrice = Math.round(sellingPrice);
+            amount = Math.round(amount);
+        }
+
         // Build description: product name + optional description line + optional remarks
         const namePart = item.resolvedName || '-';
         const descPart = item.resolvedDesc ? `\n${item.resolvedDesc}` : '';
@@ -189,8 +198,8 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
             String(i + 1),
             descText,
             String(qty),
-            fmtCurrency(sellingPrice),
-            fmtCurrency(amount)
+            fmtCurrency(sellingPrice, tx.currency),
+            fmtCurrency(amount, tx.currency)
         ];
     });
 
@@ -244,25 +253,16 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         const rawCost = Number(item.cost) || 0;
         const margin = Number(item.margin) || 0;
         const qty = Number(item.qty) || 0;
-        const sellingPrice = Math.round((rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100)));
-        subtotal += Math.round(sellingPrice * qty);
+        let sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+        let amount = sellingPrice * qty;
+        if (tx.currency !== 'USD') {
+            amount = Math.round(amount);
+        }
+        subtotal += amount;
     });
 
-    const totalsX = pageW - marginR - 75;
-    const totalsValX = pageW - marginR;
-
-    const drawTotalRow = (label, value, bold = false, bg = false) => {
-        if (bg) {
-            doc.setFillColor(...PDF_COLORS.PRIMARY);
-            doc.roundedRect(totalsX - 4, y - 4, 79, 8, 1, 1, 'F');
-        }
-        doc.setFont('helvetica', bold ? 'bold' : 'normal');
-        doc.setFontSize(bold ? 10 : 9);
-        doc.setTextColor(bg ? 255 : (bold ? PDF_COLORS.DARK[0] : PDF_COLORS.SECONDARY[0]), bg ? 255 : (bold ? PDF_COLORS.DARK[1] : PDF_COLORS.SECONDARY[1]), bg ? 255 : (bold ? PDF_COLORS.DARK[2] : PDF_COLORS.SECONDARY[2]));
-        doc.text(label, totalsX, y);
-        doc.text(value, totalsValX, y, { align: 'right' });
-        y += bold ? 8 : 6;
-    };
+    const ppn = tx.currency === 'USD' ? (subtotal * 0.11) : Math.round(subtotal * 0.11);
+    const grandTotal = tx.currency === 'USD' ? (subtotal + ppn) : Math.round(subtotal + ppn);
 
     // Check for page break before totals
     const totalsAreaH = 30;
@@ -271,17 +271,33 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         y = 25;
     }
 
-    drawTotalRow('Subtotal', fmtCurrency(subtotal));
+    const totalsW = 65;
+    const totalsX = pageW - marginR - totalsW;
 
-    // PPN
-    const ppn = Math.round(subtotal * 0.11);
-    drawTotalRow('PPN', fmtCurrency(ppn));
+    const drawTotalRow = (label, value, bold = false, bg = false) => {
+        if (bg) {
+            doc.setFillColor(...PDF_COLORS.PRIMARY);
+            doc.roundedRect(totalsX - 4, y - 4, totalsW + 4, 8, 1, 1, 'F');
+        }
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(bold ? 9.5 : 8.5);
+        doc.setTextColor(bg ? 255 : (bold ? PDF_COLORS.PRIMARY_D[0] : PDF_COLORS.DARK[0]), bg ? 255 : (bold ? PDF_COLORS.PRIMARY_D[1] : PDF_COLORS.DARK[1]), bg ? 255 : (bold ? PDF_COLORS.PRIMARY_D[2] : PDF_COLORS.DARK[2]));
+        doc.text(label, totalsX, y);
+        doc.text(value, pageW - marginR, y, { align: 'right' });
+        y += bold ? 8 : 5.5;
+    };
 
-    y += 1;
-    const grandTotal = subtotal + ppn;
-    drawTotalRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
+    drawTotalRow('Subtotal', fmtCurrency(subtotal, tx.currency));
+    drawTotalRow('PPN (11%)', fmtCurrency(ppn, tx.currency));
 
-    y += 10;
+    doc.setDrawColor(...PDF_COLORS.ACCENT_LINE);
+    doc.setLineWidth(0.4);
+    doc.line(totalsX, y - 1, pageW - marginR, y - 1);
+    y += 2;
+
+    drawTotalRow('GRAND TOTAL', fmtCurrency(grandTotal, tx.currency), true, true);
+
+    y += 8;
 
     // ── TERMS & CONDITIONS (after totals, before signature) ──
     const defaultTerms = '1. Prices are quoted excluding VAT\n2. PO that has been received by PT IDE SOLUSI INTEGRASI cannot be canceled\n3. This price is valid until 14 days';
@@ -1103,6 +1119,48 @@ function terbilangID(n) {
     return res.charAt(0).toUpperCase() + res.slice(1) + ' Rupiah';
 }
 
+function terbilangEN(n) {
+    const units = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen'];
+    const tens = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety'];
+    const scales = ['', 'Thousand', 'Million', 'Billion'];
+
+    function convertTriple(num) {
+        if (num === 0) return '';
+        if (num < 20) return units[num];
+        if (num < 100) return tens[Math.floor(num / 10)] + (num % 10 ? '-' + units[num % 10] : '');
+        return units[Math.floor(num / 100)] + ' Hundred' + (num % 100 ? ' ' + convertTriple(num % 100) : '');
+    }
+
+    const parts = n.toFixed(2).split('.');
+    let integerPart = parseInt(parts[0]);
+    let decimalPart = parseInt(parts[1]);
+
+    if (integerPart === 0 && decimalPart === 0) return 'Zero US Dollars';
+
+    let res = '';
+    let scaleIdx = 0;
+    while (integerPart > 0) {
+        let triple = integerPart % 1000;
+        if (triple !== 0) {
+            let tripleText = convertTriple(triple);
+            res = tripleText + (scales[scaleIdx] ? ' ' + scales[scaleIdx] : '') + (res ? ' ' + res : '');
+        }
+        integerPart = Math.floor(integerPart / 1000);
+        scaleIdx++;
+    }
+
+    res = (res ? res : 'Zero') + ' US Dollars';
+    if (decimalPart > 0) {
+        res += ' and ' + convertTriple(decimalPart) + ' Cents';
+    }
+    return res;
+}
+
+const terbilang = (n, currencyCode = 'IDR') => {
+    if (currencyCode === 'USD') return terbilangEN(n);
+    return terbilangID(n);
+};
+
 // Helper: generate QR code as PNG data URL
 async function genQRDataURL(text) {
     try {
@@ -1303,8 +1361,8 @@ async function generateProformaInvoicePDF(jsPDF, tx, settings, client) {
                 descText,
                 String(item.qty || 0),
                 item.unit || 'Pcs',
-                fmtCurrency(item.sellingPrice),
-                fmtCurrency(item.amount)
+                fmtCurrency(item.sellingPrice, tx.currency),
+                fmtCurrency(item.amount, tx.currency)
             ]);
         });
     });
@@ -1363,17 +1421,20 @@ async function generateProformaInvoicePDF(jsPDF, tx, settings, client) {
     let serviceAmt = 0;
 
     resolvedItems.forEach(item => {
-        subtotal += item.amount;
+        let amt = item.amount;
+        if (tx.currency !== 'USD') {
+            amt = Math.round(amt);
+        }
+        subtotal += amt;
         if ((item.category || '').toLowerCase().includes('service')) {
-            serviceAmt += item.amount;
+            serviceAmt += amt;
         }
     });
 
-    subtotal = Math.round(subtotal);
-    const dpp = Math.round(subtotal * 11 / 12);
-    const ppn = Math.round(dpp * 0.12);
-    const pph23 = Math.round(serviceAmt * -0.02);
-    const grandTotal = Math.round(subtotal + ppn + pph23);
+    const dpp = tx.currency === 'USD' ? (subtotal * 11 / 12) : Math.round(subtotal * 11 / 12);
+    const ppn = tx.currency === 'USD' ? (dpp * 0.12) : Math.round(dpp * 0.12);
+    const pph23 = tx.currency === 'USD' ? (serviceAmt * -0.02) : Math.round(serviceAmt * -0.02);
+    const grandTotal = tx.currency === 'USD' ? (subtotal + ppn + pph23) : Math.round(subtotal + ppn + pph23);
 
     const totX = pageW - mR - 82;
     const totVX = pageW - mR;
@@ -1401,13 +1462,13 @@ async function generateProformaInvoicePDF(jsPDF, tx, settings, client) {
         y += 2;
     };
 
-    drawTaxRow('Subtotal', fmtCurrency(subtotal));
-    drawTaxRow('DPP', fmtCurrency(dpp));
-    drawTaxRow('PPN 12%', fmtCurrency(ppn));
-    if (pph23 !== 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23));
+    drawTaxRow('Subtotal', fmtCurrency(subtotal, tx.currency));
+    drawTaxRow('DPP', fmtCurrency(dpp, tx.currency));
+    drawTaxRow('PPN 12%', fmtCurrency(ppn, tx.currency));
+    if (pph23 !== 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23, tx.currency));
     drawTaxDivider();
     y += 2;
-    drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
+    drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal, tx.currency), true, true);
     y += 4;
 
     y += 2;
@@ -1540,7 +1601,7 @@ async function generateProformaInvoicePDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'italic');
     doc.setFontSize(7);
     doc.setTextColor(...C.SECONDARY);
-    const amountInWordsStr = terbilang(grandTotal);
+    const amountInWordsStr = terbilang(grandTotal, tx.currency);
     doc.text(`Terbilang: ${amountInWordsStr}`, mL, footerY + 5);
 
     doc.setDrawColor(...C.PRIMARY);
@@ -1771,8 +1832,8 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
                 descText,
                 String(item.qty || 0),
                 item.unit || 'Pcs',
-                fmtCurrency(item.sellingPrice),
-                fmtCurrency(item.amount)
+                fmtCurrency(item.sellingPrice, tx.currency),
+                fmtCurrency(item.amount, tx.currency)
             ]);
         });
     });
@@ -1834,18 +1895,21 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     let serviceAmt = 0;
 
     resolvedItems.forEach(item => {
-        subtotal += item.amount;
+        let amt = item.amount;
+        if (tx.currency !== 'USD') {
+            amt = Math.round(amt);
+        }
+        subtotal += amt;
         if ((item.category || '').toLowerCase().includes('service')) {
-            serviceAmt += item.amount;
+            serviceAmt += amt;
         }
     });
 
     // Correct formula: DPP = Subtotal * 11/12, PPN = DPP * 12%, PPH23 = serviceAmt * -2%
-    subtotal = Math.round(subtotal);
-    const dpp = Math.round(subtotal * 11 / 12);
-    const ppn = Math.round(dpp * 0.12);
-    const pph23 = Math.round(serviceAmt * -0.02);
-    const grandTotal = Math.round(subtotal + ppn + pph23);   // pph23 is now a deduction
+    const dpp = tx.currency === 'USD' ? (subtotal * 11 / 12) : Math.round(subtotal * 11 / 12);
+    const ppn = tx.currency === 'USD' ? (dpp * 0.12) : Math.round(dpp * 0.12);
+    const pph23 = tx.currency === 'USD' ? (serviceAmt * -0.02) : Math.round(serviceAmt * -0.02);
+    const grandTotal = tx.currency === 'USD' ? (subtotal + ppn + pph23) : Math.round(subtotal + ppn + pph23);   // pph23 is now a deduction
 
     const totX = pageW - mR - 82;
     const totVX = pageW - mR;
@@ -1873,13 +1937,13 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         y += 2;
     };
 
-    drawTaxRow('Subtotal', fmtCurrency(subtotal));
-    drawTaxRow('DPP', fmtCurrency(dpp));
-    drawTaxRow('PPN 12%', fmtCurrency(ppn));
-    if (pph23 !== 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23));
+    drawTaxRow('Subtotal', fmtCurrency(subtotal, tx.currency));
+    drawTaxRow('DPP', fmtCurrency(dpp, tx.currency));
+    drawTaxRow('PPN 12%', fmtCurrency(ppn, tx.currency));
+    if (pph23 !== 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23, tx.currency));
     drawTaxDivider();
     y += 2;
-    drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
+    drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal, tx.currency), true, true);
     y += 4;
 
     y += 2;
@@ -2042,13 +2106,29 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     y = Math.max(y + 4, sigLineY + 10);
 
     // ── FOOTER ────────────────────────────────────────────────────
-    const footY = pageH - 8;
-    doc.setFillColor(...C.PRIMARY);
-    doc.rect(0, footY - 5, pageW, 1.5, 'F');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(6.5);
+    const footerY = pageH - 25;
+    if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', pageW - mR - 22, footerY - 8, 22, 22);
+    }
+
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.line(mL, footerY, pageW - mR, footerY);
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
     doc.setTextColor(...C.SECONDARY);
-    doc.text(`${settings.name || 'PT IDE SOLUSI INTEGRASI'}  ·  ${settings.phone || ''}  ·  ${tx.docNumber || ''}`, pageW / 2, footY, { align: 'center' });
+    const amountInWordsStr = terbilang(grandTotal, tx.currency);
+    doc.text(`Terbilang: ${amountInWordsStr}`, mL, footerY + 5);
+
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.4);
+    doc.line(mL, footerY + 12, pageW - mR, footerY + 12);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text(`${settings.name || 'PT IDE SOLUSI INTEGRASI'}  ·  ${settings.phone || ''}  ·  ${tx.docNumber || ''}`, pageW / 2, footerY + 16, { align: 'center' });
 
     doc.save(`${tx.docNumber || 'Invoice'}.pdf`);
 }

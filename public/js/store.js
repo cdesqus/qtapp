@@ -40,6 +40,7 @@ class Store {
         this.clients = [];
         this.products = [];
         this.units = ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr'];
+        this.currencies = [{ code: 'IDR', name: 'Rupiah', symbol: 'Rp' }, { code: 'USD', name: 'US Dollar', symbol: '$' }];
         this.transactions = [];
         this.companySettings = {
             name: 'PT. IDE SOLUSI INTEGRASI',
@@ -87,6 +88,7 @@ class Store {
                 this.loadProducts(),
                 this.loadTransactions(),
                 this.loadUnits(),
+                this.loadCurrencies(),
                 this.loadUsers(),
                 this.loadSettings()
             ]);
@@ -109,6 +111,11 @@ class Store {
     async loadUnits() {
         const res = await this.apiFetch(`${API_URL}/api/units`);
         if (res && res.ok) this.units = await res.json();
+    }
+
+    async loadCurrencies() {
+        const res = await this.apiFetch(`${API_URL}/api/currencies`);
+        if (res && res.ok) this.currencies = await res.json();
     }
 
     async loadClients() {
