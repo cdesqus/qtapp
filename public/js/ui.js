@@ -31,15 +31,31 @@ class UI {
             // ── Calc selling price of a transaction ───────────────────────
             const calcTxTotal = (tx) => {
                 const rate = tx.currency === 'USD' ? 16200 : 1;
-                return (tx.items || []).reduce((sum, item) => {
+                let subtotal = 0;
+                let serviceAmt = 0;
+
+                (tx.items || []).forEach(item => {
                     const rawPrice = Number(item.price || 0);
                     const rawCost = Number(item.cost || 0);
                     const margin = Number(item.margin || 0);
                     const qty = Number(item.qty || 0);
 
                     const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
-                    return sum + (sellingPrice * qty * rate);
-                }, 0);
+                    let amt = sellingPrice * qty;
+                    if (tx.currency !== 'USD') amt = Math.round(amt);
+
+                    subtotal += amt;
+                    if ((item.category || '').toLowerCase().includes('service')) {
+                        serviceAmt += amt;
+                    }
+                });
+
+                const dpp = tx.currency === 'USD' ? (subtotal * 11 / 12) : Math.round(subtotal * 11 / 12);
+                const ppn = tx.currency === 'USD' ? (dpp * 0.12) : Math.round(dpp * 0.12);
+                const pph23 = tx.currency === 'USD' ? (serviceAmt * -0.02) : Math.round(serviceAmt * -0.02);
+                const grandTotal = tx.currency === 'USD' ? (subtotal + ppn + pph23) : Math.round(subtotal + ppn + pph23);
+
+                return grandTotal * rate;
             };
             const calcTxCost = (tx) => {
                 const rate = tx.currency === 'USD' ? 16200 : 1;
@@ -444,16 +460,20 @@ class UI {
             const fmtIDR = v => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
 
             const calcSelling = (tx) => (tx.items || []).reduce((s, item) => {
-                const price = Number(item.price || item.cost || 0);
+                const rawPrice = Number(item.price || 0);
+                const rawCost = Number(item.cost || 0);
                 const margin = Number(item.margin || 0);
                 const qty = Number(item.qty || 0);
-                return s + price * (1 + margin / 100) * qty;
+                const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+                return s + (sellingPrice * qty);
             }, 0);
 
             const calcCost = (tx) => (tx.items || []).reduce((s, item) => {
-                const cost = Number(item.price || item.cost || 0);
+                const rawPrice = Number(item.price || 0);
+                const rawCost = Number(item.cost || 0);
                 const qty = Number(item.qty || 0);
-                return s + cost * qty;
+                const costPrice = (rawCost > 0) ? rawCost : rawPrice;
+                return s + (costPrice * qty);
             }, 0);
 
             const rows = quos.map(q => {
@@ -570,10 +590,6 @@ class UI {
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </button>
                                             ` : ''}
-                                            <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);font-weight:600;" 
-                                                onclick="window.ui.printProformaInvoice('${linkedINV.id}')" title="Print Proforma Invoice">
-                                                <i class="fa-solid fa-file-invoice"></i> Proforma
-                                            </button>
                                             ` : ''}
                                         </td>
                                     </tr>
@@ -1798,15 +1814,7 @@ class UI {
     }
 
 
-    async printProformaInvoice(id) {
-        try {
-            const tx = await window.store.getTransaction(id);
-            if (!tx) return;
-            const client = window.store.clients.find(c => c.id === tx.clientId || c.id === tx.client_id) || {};
-            tx.isPI = true; // Mark as Proforma Invoice for PDF generation
-            window.generatePDF(tx, window.store.companySettings, client);
-        } catch (err) { alert("Gagal mencetak: " + err.message); }
-    }
+
 
     async printTransaction(id) {
         if (window.printPDF) {
