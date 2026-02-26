@@ -363,7 +363,7 @@ app.get('/api/next-doc-number', authenticate, async (req, res) => {
             year = String(now.getFullYear());
             month = String(now.getMonth() + 1).padStart(2, '0');
         }
-        const prefixMap = { QUO: `QT${year}${month}`, DO: `DO#${year}${month}`, BAP: `HOP${year}${month}`, INV: `INV${year}${month}` };
+        const prefixMap = { QUO: `QT${year}${month}`, DO: `DO#${year}${month}`, BAP: `HOP${year}${month}`, INV: `INV${year}${month}`, PI: `PI${year}${month}` };
         const prefix = prefixMap[type] || `${type}${year}${month}`;
         const result = await pool.query(
             "SELECT doc_number FROM transactions WHERE type = $1 AND doc_number LIKE $2 ORDER BY doc_number DESC",

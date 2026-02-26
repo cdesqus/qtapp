@@ -585,6 +585,143 @@ class UI {
         }
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  PROFORMA INVOICE MANAGEMENT
+    // ══════════════════════════════════════════════════════════
+    renderProformaInvoiceManagement() {
+        try {
+            const container = document.getElementById('content-area');
+            const allTx = window.store.transactions || [];
+            const po = t => t.customerPo || t.customer_po || '';
+            const dn = t => t.docNumber || t.doc_number || '';
+
+            const quos = allTx.filter(t => t.type === 'QUO' && po(t).trim() !== '');
+            const piList = allTx.filter(t => t.type === 'PI');
+
+            const fmt = (dateStr) => {
+                if (!dateStr) return '-';
+                const d = new Date(dateStr);
+                if (isNaN(d)) return '-';
+                return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+            };
+
+            const fmtIDR = v => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
+
+            const calcSelling = (tx) => (tx.items || []).reduce((s, item) => {
+                const price = Number(item.price || item.cost || 0);
+                const margin = Number(item.margin || 0);
+                const qty = Number(item.qty || 0);
+                return s + price * (1 + margin / 100) * qty;
+            }, 0);
+
+            const rows = quos.map(q => {
+                const linkedPI = piList.find(i => po(i) === po(q) && po(q) !== '');
+                const isPaid = linkedPI && (linkedPI.status || '').toLowerCase() === 'paid';
+                const selling = calcSelling(q);
+                return { q, linkedPI, isPaid, selling };
+            });
+
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <h3><i class="fa-solid fa-file-invoice" style="margin-right:8px;color:var(--primary);"></i>Proforma Invoice Management</h3>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="position:relative;">
+                                <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
+                                <input type="text" id="search-PI" placeholder="Search..." oninput="window.ui.filterTable('pi-table', this.value)"
+                                    style="padding:7px 10px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;">
+                            </div>
+                            <span style="font-size:0.85rem;color:var(--text-secondary);">${rows.length} Quotation dengan PO Confirmed</span>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="pi-table">
+                            <thead>
+                                <tr>
+                                    <th>No. Quotation</th>
+                                    <th>Client</th>
+                                    <th>Status PO</th>
+                                    <th>No. Proforma Invoice</th>
+                                    <th style="text-align:right;">Harga Jual</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                                ${this._buildFilterRow('pi-table', 7, [6])}
+                            </thead>
+                            <tbody>
+                                ${rows.length === 0
+                    ? '<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-secondary);">Belum ada Quotation dengan PO Confirmed.</td></tr>'
+                    : rows.map(({ q, linkedPI, isPaid, selling }) => `
+                                    <tr>
+                                        <td>
+                                            <span style="font-weight:600;color:var(--primary);">${q.docNumber || q.doc_number || '-'}</span><br>
+                                            <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(q.date)}</span>
+                                        </td>
+                                        <td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${q.clientName || q.client_name || '-'}">${q.clientName || q.client_name || '-'}</td>
+                                        <td>
+                                            <span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;background:rgba(34,197,94,0.12);color:#16a34a;border:1px solid rgba(34,197,94,0.25);">
+                                                <i class="fa-solid fa-circle-check"></i> ${q.customerPo || q.customer_po}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            ${linkedPI
+                            ? `<span style="font-weight:600;color:var(--primary);">${linkedPI.docNumber || linkedPI.doc_number || '-'}</span><br>
+                                                   <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(linkedPI.date)}</span>`
+                            : '<span style="color:var(--text-secondary);font-size:0.82rem;">Belum dibuat</span>'}
+                                        </td>
+                                        <td style="text-align:right;font-weight:600;color:var(--text-primary);font-size:0.85rem;white-space:nowrap;">
+                                            ${selling > 0 ? fmtIDR(selling) : '<span style="color:var(--text-secondary);">-</span>'}
+                                        </td>
+                                        <td>
+                                            ${linkedPI
+                            ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;${isPaid
+                                ? 'background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);'
+                                : 'background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);'}">
+                                                    <i class="fa-solid ${isPaid ? 'fa-circle-check' : 'fa-clock'}"></i>
+                                                    ${isPaid ? 'Paid' : 'Unpaid'}
+                                                </span>`
+                            : `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:500;background:rgba(100,116,139,0.1);color:var(--text-secondary);border:1px solid var(--border-color);">
+                                                    <i class="fa-regular fa-file"></i> No Proforma
+                                                </span>`}
+                                        </td>
+                                        <td style="white-space:nowrap;display:flex;gap:5px;flex-wrap:wrap;">
+                                            <button class="btn btn-sm" style="background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);font-weight:600;"
+                                                onclick="window.ui.convertTransaction('${q.id}','PI')" title="Generate Proforma Invoice">
+                                                <i class="fa-solid fa-file-invoice"></i> Proforma
+                                            </button>
+                                            ${linkedPI ? `
+                                            <button class="btn btn-sm btn-primary" onclick="window.ui.printTransaction('${linkedPI.id}')" title="Print Proforma Invoice">
+                                                <i class="fa-solid fa-print"></i>
+                                            </button>
+                                            ${isPaid
+                                ? `<button class="btn btn-sm" style="background:rgba(245,158,11,0.13);color:#d97706;border:1px solid rgba(245,158,11,0.3);font-weight:600;"
+                                                    onclick="window.ui.setTransactionStatus('${linkedPI.id}','Unpaid', 'PI')" title="Tandai Unpaid">
+                                                    <i class="fa-solid fa-clock"></i> Unpaid
+                                                   </button>`
+                                : `<button class="btn btn-sm" style="background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.3);font-weight:600;"
+                                                    onclick="window.ui.setTransactionStatus('${linkedPI.id}','Paid', 'PI')" title="Tandai Paid">
+                                                    <i class="fa-solid fa-circle-check"></i> Paid
+                                                   </button>`}
+                                            ${(window.store.currentUser && window.store.currentUser.role === 'admin') ? `
+                                            <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);font-weight:600;"
+                                                onclick="window.ui.editPI('${linkedPI.id}')" title="Edit Proforma Invoice">
+                                                <i class="fa-solid fa-pen-to-square"></i>
+                                            </button>
+                                            ` : ''}
+                                            ` : ''}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        } catch (err) {
+            this.showErrorMessage('Gagal memuat Proforma Invoice Management: ' + err.message);
+        }
+    }
+
     renderMeasurements() {
         try {
             const container = document.getElementById('content-area');
@@ -1618,6 +1755,19 @@ class UI {
         } catch (err) { alert('Gagal mengubah status: ' + err.message); }
     }
 
+    async setTransactionStatus(txId, status, type) {
+        try {
+            await window.store.updateTransactionStatus(txId, status);
+            if (type === 'PI') {
+                this.renderProformaInvoiceManagement();
+            } else if (type === 'INV') {
+                this.renderInvoiceManagement();
+            } else {
+                this.renderTransactions(type);
+            }
+        } catch (err) { alert('Gagal mengubah status: ' + err.message); }
+    }
+
     async editInvoice(invId) {
         try {
             const inv = await window.store.getTransaction(invId);
@@ -1745,6 +1895,105 @@ class UI {
         } catch (err) { alert('Gagal membuka editor Invoice: ' + err.message); }
     }
 
+    async editPI(piId) {
+        try {
+            const pi = await window.store.getTransaction(piId);
+            if (!pi) return alert('Proforma Invoice tidak ditemukan.');
+
+            let meta = {};
+            try { meta = JSON.parse(pi.invoiceNotes || pi.invoice_notes || '{}'); } catch (e) { }
+            const dueDate = meta.dueDate || '';
+            const attention = meta.attention || '';
+            const refType = meta.refType || 'PO Reference';
+            const poVal = pi.customerPo || pi.customer_po || '';
+            const invoiceDate = pi.date ? pi.date.substring(0, 10) : '';
+            const getDocNum = t => t.docNumber || t.doc_number || '';
+            const clientId = pi.clientId || pi.client_id || '';
+
+            const hdrS = 'font-weight:600;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;';
+            const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 140px 80px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
+                <span style="${hdrS}">Category</span><span style="${hdrS}">Product</span><span style="${hdrS}">Qty</span>
+                <span style="${hdrS}">Price</span><span style="${hdrS}">Unit</span><span style="${hdrS}">Remarks</span><span></span></div>`;
+
+            const content = `
+                <h3><i class="fa-solid fa-pen-to-square" style="margin-right:8px;color:var(--primary);"></i>Edit Proforma Invoice — ${getDocNum(pi)}</h3>
+                <form id="edit-pi-form">
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;">
+                        <div class="form-group"><label>Date</label><input type="date" name="date" value="${invoiceDate}" required></div>
+                        <div class="form-group"><label>Due Date</label><input type="date" name="dueDate" value="${dueDate}" required></div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr 1fr;gap:15px;margin-top:15px;">
+                        <div class="form-group"><label>Reference Type</label>
+                            <select name="refType">
+                                <option value="PO Reference" ${refType === 'PO Reference' ? 'selected' : ''}>PO Reference</option>
+                                <option value="Agreement Reference" ${refType === 'Agreement Reference' ? 'selected' : ''}>Agreement Reference</option>
+                            </select>
+                        </div>
+                        <div class="form-group"><label>Nomor Referensi</label><input type="text" name="customerPo" value="${poVal}" placeholder="Nomor PO / Agreement"></div>
+                    </div>
+                    <div class="grid" style="grid-template-columns:1fr;gap:15px;margin-top:15px;">
+                        <div class="form-group"><label>U.P. / Attention</label><input type="text" name="attention" value="${attention}" placeholder="Nama PIC klien"></div>
+                    </div>
+                    
+                    <h4 style="margin-top: 25px; margin-bottom: 10px;">Items</h4>
+                    ${itemsHeader}
+                    <div id="tx-items-container"></div>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addInvItemRow()" style="margin-top: 10px;">+ Add Item</button>
+
+                    <div style="margin-top:20px;display:flex;gap:10px;">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save" style="margin-right:6px;"></i>Simpan Perubahan</button>
+                        <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Batal</button>
+                    </div>
+                </form>`;
+            this.openModal(content);
+            this.currentItemIndex = 0;
+            if (pi.items && pi.items.length > 0) pi.items.forEach(item => this.addInvItemRow(item));
+            else this.addInvItemRow();
+
+            document.getElementById('edit-pi-form').onsubmit = async (e) => {
+                e.preventDefault();
+                const fd = new FormData(e.target);
+
+                const items = [];
+                document.querySelectorAll('#tx-items-container .tx-item-row').forEach(row => {
+                    const idx = row.dataset.index;
+                    items.push({
+                        itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                        qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                        remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
+                        category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                        unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
+                        price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                        margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
+                        cost: Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0,
+                    });
+                });
+
+                const updatedMeta = {
+                    dueDate: fd.get('dueDate'),
+                    attention: fd.get('attention') || '',
+                    refType: fd.get('refType') || 'PO Reference'
+                };
+                const data = {
+                    type: 'PI',
+                    docNumber: getDocNum(pi),
+                    customerPo: fd.get('customerPo') || '',
+                    date: fd.get('date'),
+                    clientId: clientId,
+                    status: pi.status || 'Unpaid',
+                    terms: '',
+                    invoiceNotes: JSON.stringify(updatedMeta),
+                    items: items
+                };
+                try {
+                    await window.store.updateTransaction(piId, data, items);
+                    this.closeModal();
+                    this.renderProformaInvoiceManagement();
+                } catch (err) { alert('Gagal mengupdate Proforma Invoice: ' + err.message); }
+            };
+        } catch (err) { alert('Gagal membuka editor Proforma Invoice: ' + err.message); }
+    }
+
     async printTransaction(id) {
         if (window.printPDF) {
             try {
@@ -1863,9 +2112,112 @@ class UI {
             const isDO = type === 'DO';
             const isBAP = type === 'BAP';
             const isINV = type === 'INV';
+            const isPI = type === 'PI';
             const isDraftForm = isDO || isBAP;
             const lockedCat = isDO ? 'Barang' : 'Service';
             const headerStyle = 'font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em;';
+
+            // ── PI FORM (Proforma Invoice from Quotation) ────────────────────────────
+            if (isPI) {
+                const invoiceDate = tx.date ? tx.date.substring(0, 10) : new Date().toISOString().substring(0, 10);
+                const dueDate = new Date(invoiceDate);
+                dueDate.setDate(dueDate.getDate() + 30);
+                const dueDateStr = dueDate.toISOString().substring(0, 10);
+
+                const getClientId = t => t.clientId || t.client_id || '';
+                const getPO = t => t.customerPo || t.customer_po || '';
+
+                const hdrS = 'font-weight:600;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;';
+                const itemsHeader = `<div class="tx-items-header" style="display:grid;grid-template-columns:120px 3fr 80px 140px 80px 2fr 40px;gap:10px;padding:8px 0;border-bottom:2px solid var(--border-color);margin-bottom:8px;">
+                    <span style="${hdrS}">Category</span><span style="${hdrS}">Product</span><span style="${hdrS}">Qty</span>
+                    <span style="${hdrS}">Price</span><span style="${hdrS}">Unit</span><span style="${hdrS}">Remarks</span><span></span></div>`;
+
+                const content = `
+                    <h3>New Proforma Invoice (from Quotation)</h3>
+                    <form id="transaction-form-pi">
+                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;">
+                            <div class="form-group"><label>Proforma Invoice Number</label><input type="text" name="docNumber" value="${window.store.generateNextDocNumber('PI')}" required readonly style="background:#f1f5f9;cursor:not-allowed;"></div>
+                            <div class="form-group"><label>Invoice Date</label><input type="date" name="date" id="pi-date" value="${invoiceDate}" required></div>
+                            <div class="form-group"><label>Client</label>
+                                <select name="clientId" required>
+                                    <option value="">Select Client</option>
+                                    ${window.store.clients.map(c => `<option value="${c.id}" ${getClientId(tx) === c.id ? 'selected' : ''}>${c.name}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid" style="grid-template-columns:1fr 1fr 1fr;gap:15px;margin-top:15px;">
+                            <div class="form-group"><label>Due Date</label><input type="date" name="dueDate" id="pi-due-date" value="${dueDateStr}" required></div>
+                            <div class="form-group"><label>U.P. / Attention (Opsional)</label><input type="text" name="attention" placeholder="Nama PIC klien"></div>
+                            <div class="form-group"><label>Reference Type</label>
+                                <select name="refType" style="margin-bottom:6px;">
+                                    <option value="PO Reference">PO Reference</option>
+                                    <option value="Agreement Reference">Agreement Reference</option>
+                                </select>
+                                <input type="text" name="customerPo" value="${getPO(tx)}" placeholder="Nomor Referensi">
+                            </div>
+                        </div>
+                        <h4 style="margin-top:20px;margin-bottom:10px;">Items</h4>
+                        ${itemsHeader}
+                        <div id="tx-items-container"></div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="window.ui.addInvItemRow()" style="margin-top:10px;">+ Add Item</button>
+                        <div style="margin-top:20px;">
+                            <button type="submit" class="btn btn-primary">Save Proforma Invoice</button>
+                            <button type="button" class="btn btn-secondary" onclick="window.ui.closeModal()">Cancel</button>
+                        </div>
+                    </form>`;
+                this.openModal(content);
+
+                document.getElementById('pi-date').addEventListener('change', (e) => {
+                    const d = new Date(e.target.value);
+                    d.setDate(d.getDate() + 30);
+                    document.getElementById('pi-due-date').value = d.toISOString().substring(0, 10);
+                });
+
+                this.currentItemIndex = 0;
+                if (tx.items && tx.items.length > 0) tx.items.forEach(item => this.addInvItemRow(item));
+                else this.addInvItemRow();
+
+                document.getElementById('transaction-form-pi').onsubmit = async (e) => {
+                    e.preventDefault();
+                    const fd = new FormData(e.target);
+                    const poVal = (fd.get('customerPo') || '').trim();
+
+                    if (poVal) {
+                        const allTx = window.store.transactions || [];
+                        const dupPI = allTx.find(t => t.type === 'PI' && (t.customerPo || t.customer_po || '').trim() === poVal);
+                        if (dupPI) {
+                            return alert(`Proforma Invoice dengan PO "${poVal}" sudah ada: ${dupPI.docNumber || dupPI.doc_number}.\nTidak bisa membuat duplikat.`);
+                        }
+                    }
+
+                    const items = [];
+                    document.querySelectorAll('.tx-item-row').forEach(row => {
+                        const idx = row.dataset.index;
+                        items.push({
+                            itemId: row.querySelector(`input[name="items[${idx}][itemId]"]`).value,
+                            qty: Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value),
+                            remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
+                            category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
+                            unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
+                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                            margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
+                        });
+                    });
+                    const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', refType: fd.get('refType') || 'PO Reference' };
+                    const data = {
+                        type: 'PI', docNumber: fd.get('docNumber'), customerPo: poVal,
+                        date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
+                        invoiceNotes: JSON.stringify(invMeta), items
+                    };
+                    try {
+                        await window.store.addTransaction(data, items);
+                        this.closeModal();
+                        this.renderProformaInvoiceManagement();
+                    } catch (err) { alert('Gagal menyimpan Proforma Invoice: ' + err.message); }
+                };
+                return;
+            }
+            // ── END PI ───────────────────────────────────────────────────────
 
             // ── INV FORM (Invoice from Quotation) ────────────────────────────
             if (isINV) {

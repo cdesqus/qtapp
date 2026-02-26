@@ -46,6 +46,8 @@ const printPDF = async (id) => {
         generateBASTPDF(jsPDF, tx, settings, client);
     } else if (tx.type === 'INV') {
         await generateInvoicePDF(jsPDF, tx, settings, client);
+    } else if (tx.type === 'PI') {
+        await generateProformaInvoicePDF(jsPDF, tx, settings, client);
     } else {
         const doc = new jsPDF();
         doc.setFont('helvetica', 'bold');
@@ -1109,6 +1111,448 @@ async function genQRDataURL(text) {
         await QRCode.toCanvas(canvas, text, { width: 130, margin: 1, color: { dark: '#00529b', light: '#ffffff' } });
         return canvas.toDataURL('image/png');
     } catch (e) { return null; }
+}
+
+async function generateProformaInvoicePDF(jsPDF, tx, settings, client) {
+    const C = {
+        PRIMARY: [0, 82, 155],
+        PRIMARY_D: [0, 55, 110],
+        DARK: [30, 41, 59],
+        SECONDARY: [100, 116, 139],
+        LIGHT_BG: [248, 250, 252],
+        WHITE: [255, 255, 255],
+        BORDER: [226, 232, 240],
+        GREEN: [22, 163, 74],
+        GREEN_LT: [220, 252, 231],
+        AMBER: [180, 83, 9],
+    };
+
+    let meta = {};
+    try { meta = JSON.parse(tx.invoiceNotes || tx.invoice_notes || '{}'); } catch (e) { }
+    const dueDate = meta.dueDate || '';
+    const attention = meta.attention || '';
+    const refType = meta.refType || 'PO Reference';
+    const isPaid = (tx.status || '').toLowerCase() === 'paid';
+
+    const items = tx.items || [];
+
+    // Build QR content from bank info
+    const bankQrText = [
+        settings.bankName ? `Bank: ${settings.bankName}` : '',
+        settings.bankAccount ? `No Rek: ${settings.bankAccount}` : '',
+        settings.bankHolder ? `A.N: ${settings.bankHolder}` : '',
+        `Proforma Invoice: ${tx.docNumber || ''}`,
+    ].filter(Boolean).join('\n');
+
+    const qrDataUrl = await genQRDataURL(bankQrText || tx.docNumber || 'IDE ERP');
+
+    const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+    const pageW = doc.internal.pageSize.getWidth();
+    const pageH = doc.internal.pageSize.getHeight();
+    const mL = 18, mR = 18;
+    const W = pageW - mL - mR;
+    let y = 18;
+
+    if (isPaid) {
+        doc.saveGraphicsState();
+        doc.setGState(new doc.GState({ opacity: 0.12 }));
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(88);
+        doc.setTextColor(...C.GREEN);
+        doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+        doc.restoreGraphicsState();
+    }
+
+    const logoSz = 8;
+    if (settings.logo) {
+        try { doc.addImage(settings.logo, 'AUTO', mL, y, logoSz, logoSz); } catch (e) { }
+    }
+    const nameX = settings.logo ? mL + logoSz + 3 : mL;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(12);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', nameX, y + 6);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(22);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('PROFORMA INVOICE', pageW - mR, y + 10, { align: 'right' });
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.SECONDARY);
+    let addrStr = (settings.address || '').replace(/\n/g, ' ').trim();
+    if (settings.phone) addrStr += `  •  Telp: ${settings.phone}`;
+    const addrMaxW = (pageW - mL - mR) / 2 - 4;
+    let addrY = y + 11;
+    const addrWrapped = doc.splitTextToSize(addrStr, addrMaxW);
+    doc.text(addrWrapped, nameX, addrY);
+    addrY += addrWrapped.length * 3.4;
+    if (settings.npwp) {
+        doc.text(`NPWP: ${settings.npwp}`, nameX, addrY);
+        addrY += 3.4;
+    }
+
+    y = Math.max(addrY, y + 16) + 4;
+
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(1.0);
+    doc.line(mL, y, pageW - mR, y);
+    doc.setLineWidth(0.25);
+    doc.setDrawColor(...C.BORDER);
+    doc.line(mL, y + 1.5, pageW - mR, y + 1.5);
+    y += 10;
+
+    const colMid = pageW / 2 - 5;
+    const startInfoY = y;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('BILL TO', mL, y);
+    y += 5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.setTextColor(...C.DARK);
+    const clientName = client?.name || tx.clientName || '-';
+    const clientNameLines = doc.splitTextToSize(clientName, colMid - mL - 6);
+    doc.text(clientNameLines, mL, y);
+    y += clientNameLines.length * 4.5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.SECONDARY);
+    if (client?.address) {
+        const addrLines = doc.splitTextToSize(client.address, colMid - mL - 6);
+        doc.text(addrLines, mL, y);
+        y += addrLines.length * 3.8;
+    }
+    if (attention) {
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(...C.DARK);
+        doc.text(`u.p. ${attention}`, mL, y);
+        y += 4.5;
+    }
+
+    const rLX = colMid + 8;
+    const rRX = pageW - mR;
+    let ry = startInfoY;
+
+    const drawDocRow = (label, value, bold = false, hilight = false) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.SECONDARY);
+        doc.text(label, rLX, ry);
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(bold ? 10 : 8.5);
+        doc.setTextColor(hilight ? C.PRIMARY[0] : C.DARK[0], hilight ? C.PRIMARY[1] : C.DARK[1], hilight ? C.PRIMARY[2] : C.DARK[2]);
+        doc.text(value, rRX, ry, { align: 'right' });
+        ry += bold ? 7 : 5.5;
+    };
+
+    drawDocRow('Proforma Inv. No.', tx.docNumber || '-', true, true);
+    drawDocRow('Invoice Date', fmtDate(tx.date));
+    if (tx.customerPo || tx.customer_po) drawDocRow(refType, tx.customerPo || tx.customer_po);
+
+    y = Math.max(y + 6, ry + 4);
+
+    const resolvedItems = items.map(item => {
+        let name = item.itemName || item.item_name || '';
+        let desc = item.itemDescription || item.item_description || '';
+        if (!name && item.itemId) {
+            const prod = window.store.products.find(p => p.id === item.itemId);
+            if (prod) { name = prod.name; desc = prod.description || ''; }
+        }
+        const rawPrice = Number(item.price) || 0;
+        const rawCost = Number(item.cost) || 0;
+        const margin = Number(item.margin) || 0;
+        const qty = Number(item.qty) || 0;
+
+        const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+        const amount = sellingPrice * qty;
+        return { ...item, resolvedName: name, resolvedDesc: desc, sellingPrice, amount };
+    });
+
+    const tableHeaders = [['NO', 'DESCRIPTION', 'QTY', 'UNIT', 'UNIT PRICE', 'AMOUNT']];
+
+    const categoryOrder = [];
+    const categoryMap = {};
+    resolvedItems.forEach(item => {
+        const cat = (item.category || 'Lainnya').trim();
+        if (!categoryMap[cat]) { categoryMap[cat] = []; categoryOrder.push(cat); }
+        categoryMap[cat].push(item);
+    });
+
+    const catDisplayName = { 'Barang': 'GOODS', 'Service': 'SERVICE' };
+    const tableBody = [];
+    const categoryRowIndices = new Set();
+    let itemNo = 1;
+    categoryOrder.forEach(cat => {
+        const catLabel = catDisplayName[cat] || cat.toUpperCase();
+        categoryRowIndices.add(tableBody.length);
+        tableBody.push([{ content: catLabel, colSpan: 6 }]);
+        categoryMap[cat].forEach(item => {
+            const namePart = item.resolvedName || '-';
+            const descPart = item.resolvedDesc ? `\n${item.resolvedDesc}` : '';
+            const remarkPart = item.remarks ? `\n${item.remarks}` : '';
+            const descText = namePart + descPart + remarkPart;
+            tableBody.push([
+                String(itemNo++),
+                descText,
+                String(item.qty || 0),
+                item.unit || 'Pcs',
+                fmtCurrency(item.sellingPrice),
+                fmtCurrency(item.amount)
+            ]);
+        });
+    });
+
+    doc.autoTable({
+        startY: y,
+        head: tableHeaders,
+        body: tableBody,
+        theme: 'plain',
+        margin: { left: mL, right: mR },
+        tableWidth: W,
+        styles: {
+            font: 'helvetica', fontSize: 8.5,
+            cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 4 },
+            textColor: C.DARK, lineColor: C.BORDER, lineWidth: 0.1, valign: 'middle'
+        },
+        headStyles: {
+            fillColor: C.PRIMARY, textColor: C.WHITE, fontStyle: 'bold', fontSize: 8, halign: 'center', lineWidth: 0
+        },
+        columnStyles: {
+            0: { cellWidth: 14, halign: 'center' },
+            1: { cellWidth: 'auto' },
+            2: { cellWidth: 16, halign: 'center' },
+            3: { cellWidth: 18, halign: 'center' },
+            4: { cellWidth: 36, halign: 'right' },
+            5: { cellWidth: 36, halign: 'right' }
+        },
+        alternateRowStyles: { fillColor: C.LIGHT_BG },
+        didParseCell: (data) => {
+            if (data.section === 'body' && categoryRowIndices.has(data.row.index)) {
+                data.cell.styles.fillColor = [241, 245, 249];
+                data.cell.styles.textColor = [30, 41, 59];
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fontSize = 7.5;
+                data.cell.styles.halign = 'left';
+                data.cell.styles.cellPadding = { top: 2.5, bottom: 2.5, left: 6, right: 4 };
+            }
+        }
+    });
+
+    y = doc.lastAutoTable.finalY + 8;
+
+    if (y > pageH - 65) {
+        doc.addPage();
+        y = 25;
+        if (isPaid) {
+            doc.saveGraphicsState();
+            doc.setGState(new doc.GState({ opacity: 0.12 }));
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(88); doc.setTextColor(...C.GREEN);
+            doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+            doc.restoreGraphicsState();
+        }
+    }
+
+    let subtotal = 0;
+    let serviceAmt = 0;
+
+    resolvedItems.forEach(item => {
+        subtotal += item.amount;
+        if ((item.category || '').toLowerCase().includes('service')) {
+            serviceAmt += item.amount;
+        }
+    });
+
+    subtotal = Math.round(subtotal);
+    const dpp = Math.round(subtotal * 11 / 12);
+    const ppn = Math.round(dpp * 0.12);
+    const pph23 = Math.round(serviceAmt * -0.02);
+    const grandTotal = Math.round(subtotal + ppn + pph23);
+
+    const totX = pageW - mR - 82;
+    const totVX = pageW - mR;
+    const lineH = 6;
+
+    const drawTaxRow = (label, value, bold = false, highlight = false) => {
+        if (highlight) {
+            doc.setFillColor(...C.PRIMARY);
+            doc.roundedRect(totX - 4, y - 4.5, 86, 9, 1.5, 1.5, 'F');
+        }
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.setFontSize(bold ? 9.5 : 8.5);
+        doc.setTextColor(highlight ? 255 : (bold ? C.DARK[0] : C.SECONDARY[0]),
+            highlight ? 255 : (bold ? C.DARK[1] : C.SECONDARY[1]),
+            highlight ? 255 : (bold ? C.DARK[2] : C.SECONDARY[2]));
+        doc.text(label, totX, y);
+        doc.text(value, totVX, y, { align: 'right' });
+        y += lineH;
+    };
+
+    const drawTaxDivider = () => {
+        doc.setDrawColor(...C.BORDER);
+        doc.setLineWidth(0.3);
+        doc.line(totX - 4, y - 2, totVX, y - 2);
+        y += 2;
+    };
+
+    drawTaxRow('Subtotal', fmtCurrency(subtotal));
+    drawTaxRow('DPP', fmtCurrency(dpp));
+    drawTaxRow('PPN 12%', fmtCurrency(ppn));
+    if (pph23 !== 0) drawTaxRow('PPH23 2% (Service)', fmtCurrency(pph23));
+    drawTaxDivider();
+    y += 2;
+    drawTaxRow('GRAND TOTAL', fmtCurrency(grandTotal), true, true);
+    y += 4;
+
+    y += 2;
+
+    const hasBank = settings.bankName || settings.bankAccount || settings.bankHolder;
+    const hasBank2 = settings.bank2Name || settings.bank2Account || settings.bank2Holder;
+
+    if (y > pageH - 85) {
+        doc.addPage();
+        y = 25;
+        if (isPaid) {
+            doc.saveGraphicsState();
+            doc.setGState(new doc.GState({ opacity: 0.12 }));
+            doc.setFont('helvetica', 'bold'); doc.setFontSize(88); doc.setTextColor(...C.GREEN);
+            doc.text('LUNAS', pageW / 2, pageH / 2 + 20, { align: 'center', angle: 38 });
+            doc.restoreGraphicsState();
+        }
+    }
+
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.3);
+    doc.line(mL, y, pageW - mR, y);
+    y += 5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.PRIMARY);
+    doc.text('Catatan:', mL, y);
+    y += 4.5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('1. Mohon lampirkan bukti transfer saat melakukan pembayaran.', mL, y); y += 4;
+    doc.text('2. Pembayaran dianggap sah jika dana sudah masuk ke rekening kami.', mL, y); y += 4;
+    if (dueDate) { doc.text(`3. Pembayaran paling lambat tanggal ${fmtDate(dueDate)}.`, mL, y); y += 4; }
+    y += 4;
+
+    const payStartY = y;
+
+    const sigBoxW = 68;
+    const sigBoxX = pageW - mR - sigBoxW;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Hormat kami,', sigBoxX + sigBoxW / 2, payStartY, { align: 'center' });
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8);
+    doc.setTextColor(...C.DARK);
+    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigBoxX + sigBoxW / 2, payStartY + 5, { align: 'center' });
+
+    const sigLineY = payStartY + 43;
+    doc.setDrawColor(...C.BORDER);
+    doc.setLineWidth(0.4);
+    doc.line(sigBoxX + 6, sigLineY, sigBoxX + sigBoxW - 6, sigLineY);
+
+    const currentUser = window.store.currentUser;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(...C.DARK);
+    doc.text('JOHAN ABIDIN', sigBoxX + sigBoxW / 2, sigLineY + 5, { align: 'center' });
+
+    if (hasBank || hasBank2) {
+        const payMaxX = sigBoxX - 8;
+        const lblX = mL;
+        const colonX = mL + 26;
+        const valX = mL + 30;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.setTextColor(...C.PRIMARY);
+        doc.text('Transfer Pembayaran ke:', lblX, y);
+        y += 4.5;
+
+        const printBankText = (bankName, bankAccount, bankHolder, bankAddress, bankSwift, label) => {
+            if (!bankName && !bankAccount) return;
+            if (label) {
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(7.8);
+                doc.setTextColor(...C.DARK);
+                doc.text(label, lblX, y); y += 4;
+            }
+            const rows = [
+                ['Bank', bankName],
+                ['No. Rekening', bankAccount],
+                ['Atas Nama', bankHolder],
+                ['Alamat Bank', bankAddress],
+                ['SWIFT/BIC', bankSwift],
+            ];
+            rows.forEach(([lbl, val]) => {
+                if (!val) return;
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(7.8);
+                doc.setTextColor(...C.SECONDARY);
+                doc.text(lbl, lblX + 4, y);
+                doc.text(':', colonX, y);
+                const wrapped = doc.splitTextToSize(String(val), payMaxX - valX);
+                doc.text(wrapped, valX, y);
+                y += wrapped.length * 3.8;
+            });
+        };
+
+        if (hasBank && hasBank2) {
+            printBankText(settings.bankName, settings.bankAccount, settings.bankHolder,
+                settings.bankAddress, settings.bankSwift, 'Rekening 1:');
+            y += 2;
+            printBankText(settings.bank2Name, settings.bank2Account, settings.bank2Holder,
+                settings.bank2Address, settings.bank2Swift, 'Rekening 2:');
+        } else if (hasBank) {
+            printBankText(settings.bankName, settings.bankAccount, settings.bankHolder,
+                settings.bankAddress, settings.bankSwift, null);
+        } else {
+            printBankText(settings.bank2Name, settings.bank2Account, settings.bank2Holder,
+                settings.bank2Address, settings.bank2Swift, null);
+        }
+    }
+
+    y = Math.max(y + 4, sigLineY + 10);
+
+    const footerY = pageH - 25;
+    if (qrDataUrl) {
+        doc.addImage(qrDataUrl, 'PNG', pageW - mR - 22, footerY - 8, 22, 22);
+    }
+
+    doc.setDrawColor(226, 232, 240);
+    doc.setLineWidth(0.4);
+    doc.line(mL, footerY, pageW - mR, footerY);
+
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.SECONDARY);
+    const amountInWordsStr = terbilang(grandTotal);
+    doc.text(`Terbilang: ${amountInWordsStr}`, mL, footerY + 5);
+
+    doc.setDrawColor(...C.PRIMARY);
+    doc.setLineWidth(0.4);
+    doc.line(mL, footerY + 12, pageW - mR, footerY + 12);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(...C.SECONDARY);
+    doc.text('Proforma Invoice ini dibuat & dicetak secara otomatis.', pageW / 2, footerY + 16, { align: 'center' });
+
+    doc.save(`${tx.docNumber || 'Proforma_Invoice'}.pdf`);
 }
 
 async function generateInvoicePDF(jsPDF, tx, settings, client) {
