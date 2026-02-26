@@ -30,27 +30,34 @@ class UI {
 
             // ── Calc selling price of a transaction ───────────────────────
             const calcTxTotal = (tx) => {
+                const rate = tx.currency === 'USD' ? 16200 : 1;
                 return (tx.items || []).reduce((sum, item) => {
                     const price = Number(item.price || 0);
                     const cost = Number(item.cost || 0);
                     const margin = Number(item.margin || 0);
                     const qty = Number(item.qty || 0);
 
-                    if (cost > 0) {
-                        // New system: price column stores the unit selling price
-                        return sum + price * qty;
+                    // New system check: has cost property, or cost > 0, or is generated recently
+                    const isNew = item.hasOwnProperty('cost') || cost > 0 || (new Date(tx.date) >= new Date('2024-01-01') && !('cost' in item));
+
+                    if (isNew) {
+                        return sum + (price * qty * rate);
                     } else {
-                        // Legacy system: price column stores the cost, apply margin
-                        return sum + price * (1 + margin / 100) * qty;
+                        return sum + (price * (1 + margin / 100) * qty * rate);
                     }
                 }, 0);
             };
             const calcTxCost = (tx) => {
+                const rate = tx.currency === 'USD' ? 16200 : 1;
                 return (tx.items || []).reduce((sum, item) => {
-                    // Try 'cost' column first, then 'price' (for legacy)
-                    const costVal = Number(item.cost || item.price || 0);
-                    const qty = Number(item.qty || 0);
-                    return sum + costVal * qty;
+                    const cost = Number(item.cost || 0);
+                    const isNew = item.hasOwnProperty('cost') || cost > 0 || (new Date(tx.date) >= new Date('2024-01-01') && !('cost' in item));
+
+                    if (isNew) {
+                        return sum + (cost * Number(item.qty || 0) * rate);
+                    } else {
+                        return sum + (Number(item.price || 0) * Number(item.qty || 0) * rate);
+                    }
                 }, 0);
             };
 
@@ -2053,13 +2060,14 @@ class UI {
                             unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
                             price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
+                            cost: Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0,
                         });
                     });
                     const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '', refType: fd.get('refType') || 'PO Reference', customNote: fd.get('customNote') || '' };
                     const data = {
                         type: 'INV', docNumber: fd.get('docNumber'), customerPo: poVal,
                         date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
-                        invoiceNotes: JSON.stringify(invMeta), items
+                        invoiceNotes: JSON.stringify(invMeta), items, currency: fd.get('currency') || 'IDR'
                     };
                     try {
                         await window.store.addTransaction(data, items);
