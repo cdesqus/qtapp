@@ -578,6 +578,10 @@ class UI {
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </button>
                                             ` : ''}
+                                            <button class="btn btn-sm" style="background:rgba(59,130,246,0.12);color:#3b82f6;border:1px solid rgba(59,130,246,0.3);font-weight:600;" 
+                                                onclick="window.ui.printProformaInvoice('${linkedINV.id}')" title="Print Proforma Invoice">
+                                                <i class="fa-solid fa-file-invoice"></i> Proforma
+                                            </button>
                                             ` : ''}
                                         </td>
                                     </tr>
@@ -1801,6 +1805,16 @@ class UI {
         } catch (err) { alert('Gagal membuka editor Invoice: ' + err.message); }
     }
 
+
+    async printProformaInvoice(id) {
+        try {
+            const tx = await window.store.getTransaction(id);
+            if (!tx) return;
+            const client = window.store.clients.find(c => c.id === tx.clientId || c.id === tx.client_id) || {};
+            tx.isPI = true; // Mark as Proforma Invoice for PDF generation
+            window.generatePDF(tx, window.store.companySettings, client);
+        } catch (err) { alert("Gagal mencetak: " + err.message); }
+    }
 
     async printTransaction(id) {
         if (window.printPDF) {

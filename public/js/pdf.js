@@ -1243,11 +1243,10 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
     doc.setTextColor(...C.PRIMARY);
     doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', nameX, y + 6);
 
-    // "INVOICE" title — right side, large
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(28);
+    const title = tx.isPI ? 'PROFORMA INVOICE' : 'INVOICE';
+    doc.setFontSize(tx.isPI ? 22 : 28);
     doc.setTextColor(...C.PRIMARY);
-    doc.text('INVOICE', pageW - mR, y + 10, { align: 'right' });
+    doc.text(title, pageW - mR, y + 10, { align: 'right' });
 
     // Address & phone below company name (aligned to nameX) — all on one line flow
     doc.setFont('helvetica', 'normal');
@@ -1327,11 +1326,15 @@ async function generateInvoicePDF(jsPDF, tx, settings, client) {
         ry += bold ? 7 : 5.5;
     };
 
-    drawDocRow('Invoice No.', tx.docNumber || '-', true, true);
-    drawDocRow('Invoice Date', fmtDate(tx.date));
+    drawDocRow(tx.isPI ? 'Proforma Inv. No.' : 'Invoice No.', tx.docNumber || '-', true, true);
+    drawDocRow(tx.isPI ? 'Proforma Date' : 'Invoice Date', fmtDate(tx.date));
     if (tx.customerPo || tx.customer_po) drawDocRow(refType, tx.customerPo || tx.customer_po);
-    if (doRef && hasBarang) drawDocRow('DO Reference', doRef);
-    if (bastRef && hasService) drawDocRow('BAST Reference', bastRef);
+
+    // Skip DO/BAST ref if it's a Proforma Invoice
+    if (!tx.isPI) {
+        if (doRef && hasBarang) drawDocRow('DO Reference', doRef);
+        if (bastRef && hasService) drawDocRow('BAST Reference', bastRef);
+    }
 
     y = Math.max(y + 6, ry + 4);
 
