@@ -267,6 +267,22 @@ class UI {
         });
     }
 
+    filterInvoiceStatus(tableId, status) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length > 10) {
+                const text = cells[10].textContent.trim();
+                let show = true;
+                if (status) {
+                    show = (text === status);
+                }
+                row.style.display = show ? '' : 'none';
+            }
+        });
+    }
+
     _buildFilterRow(tableId, colCount, skipCols = []) {
         const inputStyle = 'padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;font-size:0.75rem;width:100%;background:var(--card-bg);color:var(--text-primary);';
         let cells = '';
@@ -288,10 +304,17 @@ class UI {
                 <div class="card">
                     <div class="card-header">
                         <h3>Client List</h3>
-                        <button class="btn btn-primary" onclick="window.ui.openClientForm()"><i class="fa-solid fa-plus"></i> New Client</button>
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <div style="position:relative;">
+                                <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
+                                <input type="text" id="search-clients" placeholder="Search clients..." oninput="window.ui.filterTable('clients-table', this.value)"
+                                    style="padding:7px 10px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;">
+                            </div>
+                            <button class="btn btn-primary" onclick="window.ui.openClientForm()"><i class="fa-solid fa-plus"></i> New Client</button>
+                        </div>
                     </div>
                     <div class="table-container">
-                        <table>
+                        <table id="clients-table">
                             <thead>
                                 <tr><th>Name</th><th>Email</th><th>PIC</th><th>Nomor NPWP</th><th>Actions</th></tr>
                             </thead>
@@ -493,9 +516,15 @@ class UI {
                         <h3><i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;color:var(--primary);"></i>Invoice Management</h3>
                         <div style="display:flex;align-items:center;gap:10px;">
                             <div style="position:relative;">
-                                <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
-                                <input type="text" id="search-INV" placeholder="Search..." oninput="window.ui.filterTable('inv-table', this.value)"
-                                    style="padding:7px 10px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;">
+                                <i class="fa-solid fa-filter" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
+                                <select id="search-INV" onchange="window.ui.filterInvoiceStatus('inv-table', this.value)"
+                                    style="padding:7px 30px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;appearance:none;-webkit-appearance:none;cursor:pointer;">
+                                    <option value="">Semua Status</option>
+                                    <option value="Paid">Paid</option>
+                                    <option value="Unpaid">Unpaid</option>
+                                    <option value="No Invoice">No Invoice</option>
+                                </select>
+                                <i class="fa-solid fa-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;pointer-events:none;"></i>
                             </div>
                             <span style="font-size:0.85rem;color:var(--text-secondary);">${rows.length} Quotation dengan PO Confirmed</span>
                         </div>
@@ -990,8 +1019,16 @@ class UI {
             e.preventDefault();
             const formData = new FormData(e.target);
             const npwpVal = (formData.get('npwpNumber') || '').trim();
+            const clientName = (formData.get('name') || '').trim();
+
+            const existingClient = window.store.clients.find(c => c.name.toLowerCase() === clientName.toLowerCase() && c.id !== id);
+            if (existingClient) {
+                alert("Client dengan nama tersebut sudah terdaftar!");
+                return;
+            }
+
             const data = {
-                name: formData.get('name'),
+                name: clientName,
                 email: formData.get('email'),
                 address: formData.get('address'),
                 pic: formData.get('pic') || '',
@@ -2429,12 +2466,12 @@ class UI {
                     onfocus="window.ui.onProductSearch(this,${idx})"
                     style="${inputStyle}">
                 <input type="hidden" name="items[${idx}][itemId]"  value="${productId}">
-                <input type="number" name="items[${idx}][price]"   value="${priceVal}" placeholder="Price" style="${inputStyle}text-align:right;">
                 <input type="hidden" name="items[${idx}][margin]"  value="${marginVal}">
                 <input type="hidden" name="items[${idx}][cost]"    value="${costVal}">
                 <div id="product-dropdown-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
             <input type="number" name="items[${idx}][qty]"     value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle}text-align:center;">
+            <input type="number" name="items[${idx}][price]"   value="${priceVal}" placeholder="Price" style="${inputStyle}text-align:right;">
             <select name="items[${idx}][unit]" style="${inputStyle}font-size:0.85rem;">${unitOptions}</select>
             <input type="text"   name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding:6px 10px;font-size:1rem;">&times;</button>
