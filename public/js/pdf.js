@@ -464,8 +464,10 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
     doc.setTextColor(...DO_COLORS.DARK);
-    doc.text(client?.name || tx.clientName || '-', marginL, y);
-    y += 5;
+    const clientNameDO = client?.name || tx.clientName || '-';
+    const clientNameLinesDO = doc.splitTextToSize(clientNameDO, 85);
+    doc.text(clientNameLinesDO, marginL, y);
+    y += clientNameLinesDO.length * 4.5 + 0.5;
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(8.5);
