@@ -658,8 +658,13 @@ function generateDeliveryOrderPDF(jsPDF, tx, settings, client) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.setTextColor(...DO_COLORS.SECONDARY);
-    doc.text(settings.name || 'PT IDE SOLUSI INTEGRASI', sigLeftX, y, { align: 'center' });
-    doc.text(client?.name || 'Customer', sigRightX, y, { align: 'center' });
+
+    const sigNameMaxW = sigColW - 10;
+    const companyNameSig = doc.splitTextToSize(settings.name || 'PT IDE SOLUSI INTEGRASI', sigNameMaxW);
+    doc.text(companyNameSig, sigLeftX, y, { align: 'center' });
+
+    const clientNameSig = doc.splitTextToSize(client?.name || 'Customer', sigNameMaxW);
+    doc.text(clientNameSig, sigRightX, y, { align: 'center' });
 
     // ── Footer line ──
     const footerY = pageH - 10;
