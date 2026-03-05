@@ -1235,7 +1235,7 @@ class UI {
                         <span style="${headerStyle}">Unit</span>
                         <span style="${headerStyle}" title="Cost Price: harga pokok produk/service">Cost Price</span>
                         <span style="${headerStyle}">Margin %</span>
-                        <span style="${headerStyle}" title="Harga Jual = Cost Price × (1 + Margin%) × Qty. Jika Margin dikosongkan, isi Harga Jual langsung.">Harga Jual</span>
+                        <span style="${headerStyle}" title="Harga Jual per unit. Isi Margin untuk auto-hitung (Cost × (1+Margin%)), atau kosongkan Margin dan isi langsung.">Harga Jual</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                     </div>`;
@@ -1377,8 +1377,9 @@ class UI {
                         if (margin_input_val !== '') {
                             finalMargin = Number(margin_input_val);
                             sellingPricePerUnit = cost_base * (1 + finalMargin / 100);
-                        } else if (amountVal !== '' && qtyVal > 0) {
-                            sellingPricePerUnit = Number(amountVal) / qtyVal;
+                        } else if (amountVal !== '') {
+                            // Manual mode: amountVal = Harga Jual per unit langsung
+                            sellingPricePerUnit = Number(amountVal);
                             finalMargin = 0;
                         } else if (costEl && priceEl) {
                             // Scaled row (Invoice)
@@ -1488,14 +1489,15 @@ class UI {
         const initQty = item ? (item.qty || 1) : 1;
         const initMargin = (item && item.margin != null) ? item.margin : null;
 
+        // Harga Jual = per unit selling price
         let initAmount = '';
         if (item) {
             if (item.cost && item.price) {
-                // New system: amount is simply price (selling) * qty
-                initAmount = (initPrice * initQty).toFixed(0);
+                // New system: price field = selling price per unit
+                initAmount = Math.round(initPrice);
             } else if (initMargin !== null && initPrice > 0) {
-                // Legacy system: amount calculated from price (cost) + margin
-                initAmount = (initPrice * (1 + initMargin / 100) * initQty).toFixed(0);
+                // Legacy: price was cost, compute selling per unit
+                initAmount = Math.round(initPrice * (1 + initMargin / 100));
             }
         }
 
@@ -1525,9 +1527,9 @@ class UI {
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
-            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Harga Jual"
+            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Harga Jual/unit"
                 oninput="window.ui.syncMarginFromAmount(${idx})"
-                title="Harga Jual total (Qty × harga/unit). Isi Margin untuk auto-hitung, atau kosongkan Margin lalu isi langsung."
+                title="Harga Jual per unit. Isi Margin untuk auto-hitung, atau kosongkan Margin lalu isi harga jual per unit langsung."
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; ${(item && item.margin != null && item.margin !== '') ? 'background: rgba(99,102,241,0.07); color: var(--text-secondary);' : 'background: white;'}">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
@@ -1550,20 +1552,19 @@ class UI {
         const price = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value) || 0;
         const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
         const margin = marginEl ? marginEl.value : '';
-        const qty = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value) || 1;
         const amtEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
         if (!amtEl) return;
         if (margin !== '') {
-            // Margin mode: auto-calculate Harga Jual, show as read-only style
-            amtEl.value = Math.round(price * (1 + Number(margin) / 100) * qty);
+            // Margin mode: Harga Jual per unit = Cost Price x (1 + Margin%)
+            amtEl.value = Math.round(price * (1 + Number(margin) / 100));
             amtEl.style.background = 'rgba(99,102,241,0.07)';
             amtEl.style.color = 'var(--text-secondary)';
-            amtEl.title = 'Harga Jual dihitung otomatis dari Cost Price × (1 + Margin%) × Qty';
+            amtEl.title = 'Harga Jual per unit dihitung otomatis: Cost Price × (1 + Margin%)';
         } else {
-            // Manual mode: Harga Jual editable directly
+            // Manual mode: Harga Jual per unit editable directly
             amtEl.style.background = 'white';
             amtEl.style.color = '';
-            amtEl.title = 'Margin dikosongkan — isi Harga Jual langsung di sini';
+            amtEl.title = 'Margin dikosongkan — isi Harga Jual per unit langsung di sini';
         }
     }
 
@@ -2211,7 +2212,7 @@ class UI {
                         <span style="${headerStyle}">Qty</span>
                         <span style="${headerStyle}" title="Cost Price: harga pokok produk/service">Cost Price</span>
                         <span style="${headerStyle}">Margin %</span>
-                        <span style="${headerStyle}" title="Harga Jual = Cost Price × (1 + Margin%) × Qty. Jika Margin dikosongkan, isi Harga Jual langsung.">Harga Jual</span>
+                        <span style="${headerStyle}" title="Harga Jual per unit. Isi Margin untuk auto-hitung (Cost × (1+Margin%)), atau kosongkan Margin dan isi langsung.">Harga Jual</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                    </div>`;
