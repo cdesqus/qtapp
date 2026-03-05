@@ -1226,7 +1226,7 @@ class UI {
                     </div>`;
                 addRowFn = 'addBastItemRow';
             } else {
-                // QUO/INV: Category | Product | Qty | Unit | Cost Price | Margin % | Amount | Remarks | ✕
+                // QUO/INV: Category | Product | Qty | Unit | Cost Price | Margin % | Harga Jual | Remarks | ✕
                 itemsHeaderHtml = `
                     <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
@@ -1235,7 +1235,7 @@ class UI {
                         <span style="${headerStyle}">Unit</span>
                         <span style="${headerStyle}" title="Cost Price: harga pokok produk/service">Cost Price</span>
                         <span style="${headerStyle}">Margin %</span>
-                        <span style="${headerStyle}" title="Amount = Cost Price × (1 + Margin%) × Qty. Bisa diisi langsung sebagai alternatif Margin.">Amount</span>
+                        <span style="${headerStyle}" title="Harga Jual = Cost Price × (1 + Margin%) × Qty. Jika Margin dikosongkan, isi Harga Jual langsung.">Harga Jual</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                     </div>`;
@@ -1525,9 +1525,10 @@ class UI {
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
-            <input type="text" name="items[${idx}][amount]" value="${initAmount}" placeholder="Amount"
+            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Harga Jual"
                 oninput="window.ui.syncMarginFromAmount(${idx})"
-                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; background: rgba(99,102,241,0.06);">
+                title="Harga Jual total (Qty × harga/unit). Isi Margin untuk auto-hitung, atau kosongkan Margin lalu isi langsung."
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; ${(item && item.margin != null && item.margin !== '') ? 'background: rgba(99,102,241,0.07); color: var(--text-secondary);' : 'background: white;'}">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
@@ -1542,29 +1543,45 @@ class UI {
         });
     }
 
-    // Sync Amount field when Price / Margin / Qty changes
+    // Sync Harga Jual field when Cost Price / Margin / Qty changes
     syncAmountFromMargin(idx) {
         const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
         if (!row) return;
         const price = Number(row.querySelector(`input[name="items[${idx}][price]"]`).value) || 0;
-        const margin = row.querySelector(`input[name="items[${idx}][margin]"]`).value;
+        const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
+        const margin = marginEl ? marginEl.value : '';
         const qty = Number(row.querySelector(`input[name="items[${idx}][qty]"]`).value) || 1;
         const amtEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
         if (!amtEl) return;
         if (margin !== '') {
-            amtEl.value = (price * (1 + Number(margin) / 100) * qty).toFixed(0);
+            // Margin mode: auto-calculate Harga Jual, show as read-only style
+            amtEl.value = Math.round(price * (1 + Number(margin) / 100) * qty);
+            amtEl.style.background = 'rgba(99,102,241,0.07)';
+            amtEl.style.color = 'var(--text-secondary)';
+            amtEl.title = 'Harga Jual dihitung otomatis dari Cost Price × (1 + Margin%) × Qty';
+        } else {
+            // Manual mode: Harga Jual editable directly
+            amtEl.style.background = 'white';
+            amtEl.style.color = '';
+            amtEl.title = 'Margin dikosongkan — isi Harga Jual langsung di sini';
         }
-        // If margin is blank, we don't touch the amount field (Manual Mode)
     }
 
-    // Sync Margin field when Amount changes (Manual Amount Mode)
+    // Sync Margin field when Harga Jual is typed directly (Manual Mode)
     syncMarginFromAmount(idx) {
         const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
         if (!row) return;
         const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
         if (!marginEl) return;
-        // If amount is filled, clear margin to indicate it's ignored (Manual Mode)
+        // Clear margin to indicate Manual Mode (Harga Jual diisi langsung)
         marginEl.value = '';
+        // Make amount field look editable (white)
+        const amtEl = row.querySelector(`input[name="items[${idx}][amount]"]`);
+        if (amtEl) {
+            amtEl.style.background = 'white';
+            amtEl.style.color = '';
+            amtEl.title = 'Margin dikosongkan — isi Harga Jual langsung di sini';
+        }
     }
 
     onProductSearch(input, idx) {
@@ -2188,12 +2205,13 @@ class UI {
                         <span></span>
                    </div>`;
             } else {
-                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
                         <span style="${headerStyle}" title="Cost Price: harga pokok produk/service">Cost Price</span>
                         <span style="${headerStyle}">Margin %</span>
+                        <span style="${headerStyle}" title="Harga Jual = Cost Price × (1 + Margin%) × Qty. Jika Margin dikosongkan, isi Harga Jual langsung.">Harga Jual</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                    </div>`;
