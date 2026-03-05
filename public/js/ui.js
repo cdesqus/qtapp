@@ -1226,16 +1226,16 @@ class UI {
                     </div>`;
                 addRowFn = 'addBastItemRow';
             } else {
-                // QUO/INV: Category | Product | Qty | Unit | Price | Margin % | Amount | Remarks | ✕
+                // QUO/INV: Category | Product | Qty | Unit | Cost Price | Margin % | Amount | Remarks | ✕
                 itemsHeaderHtml = `
                     <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
                         <span style="${headerStyle}">Unit</span>
-                        <span style="${headerStyle}">Price</span>
+                        <span style="${headerStyle}" title="Cost Price: harga pokok produk/service">Cost Price</span>
                         <span style="${headerStyle}">Margin %</span>
-                        <span style="${headerStyle}" title="Amount = Price × (1 + Margin%) × Qty. Bisa diisi langsung sebagai alternatif Margin.">Amount</span>
+                        <span style="${headerStyle}" title="Amount = Cost Price × (1 + Margin%) × Qty. Bisa diisi langsung sebagai alternatif Margin.">Amount</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
                     </div>`;
@@ -1518,8 +1518,9 @@ class UI {
             <select name="items[${idx}][unit]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
                 ${unitOptions}
             </select>
-            <input type="number" name="items[${idx}][price]" value="${initCost}" placeholder="Price" required
+            <input type="number" name="items[${idx}][price]" value="${initCost}" placeholder="Cost Price" required
                 oninput="window.ui.syncAmountFromMargin(${idx})"
+                title="Cost Price: harga pokok produk/service"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
@@ -2191,7 +2192,7 @@ class UI {
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
-                        <span style="${headerStyle}">Price</span>
+                        <span style="${headerStyle}" title="Cost Price: harga pokok produk/service">Cost Price</span>
                         <span style="${headerStyle}">Margin %</span>
                         <span style="${headerStyle}">Remarks</span>
                         <span></span>
