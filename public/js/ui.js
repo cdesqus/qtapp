@@ -392,7 +392,21 @@ class UI {
     renderTransactions(type) {
         try {
             const container = document.getElementById('content-area');
-            const txs = (window.store.transactions || []).filter(t => t.type === type);
+            const timeFilterValue = document.getElementById(`time-filter-${type}`)?.value || 'recent';
+
+            let txs = (window.store.transactions || []).filter(t => t.type === type);
+            if (timeFilterValue === 'recent') {
+                const now = new Date();
+                const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                txs = txs.filter(t => {
+                    if (!t.date) return false;
+                    const d = new Date(t.date);
+                    return (d.getMonth() === currentMonth && d.getFullYear() === currentYear) || (d >= thirtyDaysAgo);
+                });
+            }
+
             const isQuo = type === 'QUO';
             const isDO = type === 'DO';
             const isBAP = type === 'BAP';
@@ -406,6 +420,11 @@ class UI {
                     <div class="card-header">
                         <h3>${label} List</h3>
                         <div style="display:flex;align-items:center;gap:10px;">
+                            <select id="time-filter-${type}" onchange="window.ui.renderTransactions('${type}')"
+                                style="padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;cursor:pointer;">
+                                <option value="recent" ${timeFilterValue === 'recent' ? 'selected' : ''}>30 Hari / Bulan Ini</option>
+                                <option value="all" ${timeFilterValue === 'all' ? 'selected' : ''}>Semua Waktu</option>
+                            </select>
                             <div style="position:relative;">
                                 <i class="fa-solid fa-search" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
                                 <input type="text" id="search-${type}" placeholder="Search..." oninput="window.ui.filterTable('${tableId}', this.value)"
@@ -461,7 +480,21 @@ class UI {
     renderInvoiceManagement() {
         try {
             const container = document.getElementById('content-area');
-            const allTx = window.store.transactions || [];
+            const timeFilterValue = document.getElementById('time-filter-inv')?.value || 'recent';
+
+            let allTx = window.store.transactions || [];
+            if (timeFilterValue === 'recent') {
+                const now = new Date();
+                const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                allTx = allTx.filter(t => {
+                    if (!t.date) return false;
+                    const d = new Date(t.date);
+                    return (d.getMonth() === currentMonth && d.getFullYear() === currentYear) || (d >= thirtyDaysAgo);
+                });
+            }
+
             // Normalize field access helper
             const po = t => t.customerPo || t.customer_po || '';
             const cid = t => t.clientId || t.client_id || '';
@@ -515,6 +548,11 @@ class UI {
                     <div class="card-header">
                         <h3><i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;color:var(--primary);"></i>Invoice Management</h3>
                         <div style="display:flex;align-items:center;gap:10px;">
+                            <select id="time-filter-inv" onchange="window.ui.renderInvoiceManagement()"
+                                style="padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;cursor:pointer;">
+                                <option value="recent" ${timeFilterValue === 'recent' ? 'selected' : ''}>30 Hari / Bulan Ini</option>
+                                <option value="all" ${timeFilterValue === 'all' ? 'selected' : ''}>Semua Waktu</option>
+                            </select>
                             <div style="position:relative;">
                                 <i class="fa-solid fa-filter" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
                                 <select id="search-INV" onchange="window.ui.filterInvoiceStatus('inv-table', this.value)"

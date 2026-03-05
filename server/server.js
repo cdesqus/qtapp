@@ -430,13 +430,13 @@ app.post('/api/transactions', authenticate, async (req, res) => {
             try {
                 const txResult = await client.query(
                     'INSERT INTO transactions (type, doc_number, customer_po, date, client_id, terms, status, invoice_notes, project_name, currency) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
-                    [type, finalDocNumber, customerPo, date, clientId, terms, status, invoiceNotes || null, projectName || null, currency || 'IDR']
+                    [type, finalDocNumber, customerPo, date, clientId || null, terms, status, invoiceNotes || null, projectName || null, currency || 'IDR']
                 );
                 const txId = txResult.rows[0].id;
                 for (const item of items) {
                     await client.query(
                         'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                        [txId, item.itemId, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
+                        [txId, item.itemId || null, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
                     );
                 }
                 await client.query('COMMIT');
@@ -518,7 +518,7 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
 
         await client.query(
             'UPDATE transactions SET doc_number = $1, customer_po = $2, date = $3, client_id = $4, terms = $5, status = $6, invoice_notes = $7, signature = $8, project_name = $9, currency = $10 WHERE id = $11',
-            [docNumber, customerPo, date, clientId, terms, status, invoiceNotes || null, signature || null, projectName || null, currency || 'IDR', id]
+            [docNumber, customerPo, date, clientId || null, terms, status, invoiceNotes || null, signature || null, projectName || null, currency || 'IDR', id]
         );
 
         await client.query('DELETE FROM transaction_items WHERE transaction_id = $1', [id]);
@@ -526,7 +526,7 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
         for (const item of items) {
             await client.query(
                 'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                [id, item.itemId || item.item_id, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
+                [id, item.itemId || item.item_id || null, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
             );
         }
 
