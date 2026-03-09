@@ -22,6 +22,12 @@
 </head>
 
 <body>
+    <!-- Mobile hamburger & backdrop -->
+    <button id="sidebar-toggle" aria-label="Toggle Menu">
+        <i class="fa-solid fa-bars"></i>
+    </button>
+    <div id="sidebar-backdrop"></div>
+
     <div id="app">
         <aside class="sidebar">
             <div class="logo">
@@ -95,6 +101,39 @@
     <script src="js/ui.js"></script>
     <script src="js/pdf.js"></script>
     <script src="js/app.js"></script>
+
+    <!-- Mobile sidebar toggle -->
+    <script>
+        (function () {
+            const toggle   = document.getElementById('sidebar-toggle');
+            const sidebar  = document.querySelector('.sidebar');
+            const backdrop = document.getElementById('sidebar-backdrop');
+
+            function openSidebar() {
+                sidebar.classList.add('open');
+                backdrop.classList.add('visible');
+                toggle.innerHTML = '<i class="fa-solid fa-xmark"></i>';
+            }
+            function closeSidebar() {
+                sidebar.classList.remove('open');
+                backdrop.classList.remove('visible');
+                toggle.innerHTML = '<i class="fa-solid fa-bars"></i>';
+            }
+
+            toggle.addEventListener('click', function () {
+                sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+            });
+
+            backdrop.addEventListener('click', closeSidebar);
+
+            // Close sidebar after a nav button is clicked (mobile UX)
+            document.querySelector('.sidebar nav').addEventListener('click', function (e) {
+                if (e.target.closest('button') && window.innerWidth <= 900) {
+                    closeSidebar();
+                }
+            });
+        })();
+    </script>
 </body>
 
 </html>
