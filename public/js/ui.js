@@ -512,7 +512,7 @@ class UI {
                 return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
             };
 
-            // ── Price helpers ──────────────────────────────────────────
+            // Price helpers
             const fmtIDR = v => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(v);
 
             const calcSelling = (tx) => (tx.items || []).reduce((s, item) => {
@@ -533,7 +533,6 @@ class UI {
             }, 0);
 
             const rows = quos.map(q => {
-                // Match linked docs by PO number (exact) — no client-only fallback to avoid cross-linking
                 const linkedDO = doList.find(d => po(d) === po(q) && po(q) !== '');
                 const linkedBAST = bastList.find(b => po(b) === po(q) && po(q) !== '');
                 const linkedINV = invList.find(i => po(i) === po(q) && po(q) !== '');
@@ -547,16 +546,40 @@ class UI {
                 <div class="card">
                     <div class="card-header">
                         <h3><i class="fa-solid fa-file-invoice-dollar" style="margin-right:8px;color:var(--primary);"></i>Invoice Management</h3>
-                        <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+
                             <select id="time-filter-inv" onchange="window.ui.renderInvoiceManagement()"
                                 style="padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;cursor:pointer;">
                                 <option value="recent" ${timeFilterValue === 'recent' ? 'selected' : ''}>30 Hari / Bulan Ini</option>
                                 <option value="all" ${timeFilterValue === 'all' ? 'selected' : ''}>Semua Waktu</option>
                             </select>
+
+                            <div style="display:flex;align-items:center;gap:5px;">
+                                <div style="position:relative;">
+                                    <i class="fa-solid fa-calendar-days" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.75rem;pointer-events:none;z-index:1;"></i>
+                                    <input type="text" id="inv-date-start" placeholder="Start Date" readonly
+                                        style="padding:7px 8px 7px 28px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;width:120px;cursor:pointer;">
+                                </div>
+                                <span style="color:var(--text-secondary);">&#8212;</span>
+                                <div style="position:relative;">
+                                    <i class="fa-solid fa-calendar-days" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.75rem;pointer-events:none;z-index:1;"></i>
+                                    <input type="text" id="inv-date-end" placeholder="End Date" readonly
+                                        style="padding:7px 8px 7px 28px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;width:120px;cursor:pointer;">
+                                </div>
+                                <button onclick="window.ui.applyInvDateFilter()" class="btn btn-secondary"
+                                    style="padding:6px 11px;font-size:0.82rem;display:inline-flex;align-items:center;gap:5px;" title="Filter berdasarkan tanggal">
+                                    <i class="fa-solid fa-magnifying-glass"></i> Filter
+                                </button>
+                                <button onclick="window.ui.clearInvDateFilter()" class="btn btn-secondary"
+                                    style="padding:6px 9px;font-size:0.82rem;" title="Reset filter tanggal">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
+
                             <div style="position:relative;">
                                 <i class="fa-solid fa-filter" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;"></i>
                                 <select id="search-INV" onchange="window.ui.filterInvoiceStatus('inv-table', this.value)"
-                                    style="padding:7px 30px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:220px;appearance:none;-webkit-appearance:none;cursor:pointer;">
+                                    style="padding:7px 30px 7px 30px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.85rem;width:190px;appearance:none;-webkit-appearance:none;cursor:pointer;">
                                     <option value="">Semua Status</option>
                                     <option value="Paid">Paid</option>
                                     <option value="Unpaid">Unpaid</option>
@@ -564,6 +587,13 @@ class UI {
                                 </select>
                                 <i class="fa-solid fa-chevron-down" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.8rem;pointer-events:none;"></i>
                             </div>
+
+                            <button onclick="window.ui.exportInvoiceToExcel()"
+                                class="btn" title="Export ke Excel (.xlsx)"
+                                style="padding:7px 14px;font-size:0.83rem;background:rgba(34,197,94,0.15);color:#16a34a;border:1px solid rgba(34,197,94,0.35);font-weight:600;display:inline-flex;align-items:center;gap:6px;">
+                                <i class="fa-solid fa-file-excel"></i> Export Excel
+                            </button>
+
                             <span style="font-size:0.85rem;color:var(--text-secondary);">${rows.length} Quotation dengan PO Confirmed</span>
                         </div>
                     </div>
@@ -590,7 +620,7 @@ class UI {
                                 ${rows.length === 0
                     ? '<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-secondary);">Belum ada Quotation dengan PO Confirmed.</td></tr>'
                     : rows.map(({ q, linkedDO, linkedBAST, linkedINV, isPaid, selling, cost }) => `
-                                    <tr>
+                                    <tr data-quo-date="${q.date || ''}">
                                         <td>
                                             <span style="font-weight:600;color:var(--primary);">${q.docNumber || q.doc_number || '-'}</span><br>
                                             <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(q.date)}</span>
@@ -605,22 +635,18 @@ class UI {
                                         <td style="font-size:0.85rem;">${linkedDO ? fmt(linkedDO.date) : '-'}</td>
                                         <td>${linkedBAST ? `<span style="font-weight:600;">${linkedBAST.docNumber || linkedBAST.doc_number || '-'}</span>` : '<span style="color:var(--text-secondary);">-</span>'}</td>
                                         <td style="font-size:0.85rem;">${linkedBAST ? fmt(linkedBAST.date) : '-'}</td>
-                                        <!-- No. Invoice -->
                                         <td>
                                             ${linkedINV
                             ? `<span style="font-weight:600;color:var(--primary);">${linkedINV.docNumber || linkedINV.doc_number || '-'}</span><br>
                                                    <span style="font-size:0.75rem;color:var(--text-secondary);">${fmt(linkedINV.date)}</span>`
                             : '<span style="color:var(--text-secondary);font-size:0.82rem;">Belum dibuat</span>'}
                                         </td>
-                                        <!-- Harga Jual (before tax) -->
                                         <td style="text-align:right;font-weight:600;color:var(--text-primary);font-size:0.85rem;white-space:nowrap;">
                                             ${selling > 0 ? fmtIDR(selling) : '<span style="color:var(--text-secondary);">-</span>'}
                                         </td>
-                                        <!-- Cost Price -->
                                         <td style="text-align:right;font-size:0.82rem;color:var(--text-secondary);white-space:nowrap;">
                                             ${cost > 0 ? fmtIDR(cost) : '<span>-</span>'}
                                         </td>
-                                        <!-- Status -->
                                         <td>
                                             ${linkedINV
                             ? `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:0.78rem;font-weight:600;${isPaid
@@ -666,8 +692,178 @@ class UI {
                     </div>
                 </div>
             `;
+
+            // Init Flatpickr date pickers
+            const fpOpts = {
+                dateFormat: 'Y-m-d',
+                altInput: true,
+                altFormat: 'd M Y',
+                locale: { firstDayOfWeek: 1 },
+                allowInput: false
+            };
+            flatpickr('#inv-date-start', { ...fpOpts });
+            flatpickr('#inv-date-end',   { ...fpOpts });
+
+            // Restore previously chosen dates so filter survives re-renders
+            if (window._invDateStart) {
+                const fp = document.getElementById('inv-date-start')?._flatpickr;
+                if (fp) fp.setDate(window._invDateStart, false);
+            }
+            if (window._invDateEnd) {
+                const fp = document.getElementById('inv-date-end')?._flatpickr;
+                if (fp) fp.setDate(window._invDateEnd, false);
+            }
+
+            // Auto-apply date filter if dates were previously set
+            if (window._invDateStart || window._invDateEnd) {
+                this.applyInvDateFilter();
+            }
+
         } catch (err) {
             this.showErrorMessage('Gagal memuat Invoice Management: ' + err.message);
+        }
+    }
+
+    // ── Apply date-range filter to visible invoice rows ────────────────────
+    applyInvDateFilter() {
+        const startFp = document.getElementById('inv-date-start')?._flatpickr;
+        const endFp   = document.getElementById('inv-date-end')?._flatpickr;
+        const startDate = startFp && startFp.selectedDates[0] ? new Date(startFp.selectedDates[0]) : null;
+        const endDate   = endFp   && endFp.selectedDates[0]   ? new Date(endFp.selectedDates[0])   : null;
+
+        // Persist dates so they survive re-renders
+        window._invDateStart = startDate;
+        window._invDateEnd   = endDate;
+
+        const table = document.getElementById('inv-table');
+        if (!table) return;
+
+        if (startDate) startDate.setHours(0, 0, 0, 0);
+        if (endDate)   endDate.setHours(23, 59, 59, 999);
+
+        table.querySelectorAll('tbody tr').forEach(row => {
+            const raw = row.getAttribute('data-quo-date');
+            if (!raw) { row.style.display = ''; return; }
+            if (!startDate && !endDate) { row.style.display = ''; return; }
+            const d = new Date(raw);
+            if (isNaN(d)) { row.style.display = ''; return; }
+            let show = true;
+            if (startDate && d < startDate) show = false;
+            if (endDate   && d > endDate)   show = false;
+            row.style.display = show ? '' : 'none';
+        });
+    }
+
+    // ── Clear date-range filter ────────────────────────────────────────────
+    clearInvDateFilter() {
+        window._invDateStart = null;
+        window._invDateEnd   = null;
+        const startFp = document.getElementById('inv-date-start')?._flatpickr;
+        const endFp   = document.getElementById('inv-date-end')?._flatpickr;
+        if (startFp) startFp.clear();
+        if (endFp)   endFp.clear();
+        const table = document.getElementById('inv-table');
+        if (table) table.querySelectorAll('tbody tr').forEach(r => r.style.display = '');
+    }
+
+    // ── Export Invoice Management to Excel (.xlsx) ─────────────────────────
+    exportInvoiceToExcel() {
+        try {
+            if (typeof XLSX === 'undefined') {
+                alert('Library Excel belum dimuat. Silakan refresh halaman dan coba lagi.');
+                return;
+            }
+            const table = document.getElementById('inv-table');
+            if (!table) { alert('Tabel tidak ditemukan.'); return; }
+
+            const startFp = document.getElementById('inv-date-start')?._flatpickr;
+            const endFp   = document.getElementById('inv-date-end')?._flatpickr;
+            const startDate = startFp && startFp.selectedDates[0] ? startFp.selectedDates[0] : null;
+            const endDate   = endFp   && endFp.selectedDates[0]   ? endFp.selectedDates[0]   : null;
+
+            const fmtD = d => d
+                ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+                : '';
+
+            // Only export VISIBLE rows (respects both date & status filters)
+            const visibleRows = Array.from(table.querySelectorAll('tbody tr'))
+                .filter(r => r.style.display !== 'none');
+
+            if (visibleRows.length === 0) {
+                alert('Tidak ada data untuk di-export. Cek filter tanggal / status.');
+                return;
+            }
+
+            const headers = [
+                'No. Quotation', 'Tanggal Quotation', 'Client', 'No. PO',
+                'No. DO', 'Tanggal DO', 'No. BAST', 'Tanggal BAST',
+                'No. Invoice', 'Tanggal Invoice',
+                'Harga Jual (IDR)', 'Cost (IDR)', 'Status Pembayaran'
+            ];
+
+            const parseIDR = txt => parseInt((txt || '').replace(/[^0-9]/g, ''), 10) || 0;
+            const getText  = el  => el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+
+            const dataRows = visibleRows.map(row => {
+                const cells = row.querySelectorAll('td');
+
+                const spans0 = cells[0] ? cells[0].querySelectorAll('span') : [];
+                const quoNum  = spans0[0] ? spans0[0].textContent.trim() : getText(cells[0]);
+                const quoDate = spans0[1] ? spans0[1].textContent.trim() : '';
+
+                const client   = getText(cells[1]);
+                const poNum    = getText(cells[2]);
+                const doNum    = getText(cells[3]);
+                const doDate   = getText(cells[4]);
+                const bastNum  = getText(cells[5]);
+                const bastDate = getText(cells[6]);
+
+                const spans7 = cells[7] ? cells[7].querySelectorAll('span') : [];
+                const invNum  = spans7[0] ? spans7[0].textContent.trim() : getText(cells[7]);
+                const invDate = spans7[1] ? spans7[1].textContent.trim() : '';
+
+                const selling = parseIDR(getText(cells[8]));
+                const cost    = parseIDR(getText(cells[9]));
+                const status  = getText(cells[10]);
+
+                return [quoNum, quoDate, client, poNum, doNum, doDate, bastNum, bastDate,
+                        invNum, invDate, selling, cost, status];
+            });
+
+            const wb = XLSX.utils.book_new();
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
+
+            ws['!cols'] = [
+                {wch:18},{wch:16},{wch:26},{wch:18},
+                {wch:16},{wch:14},{wch:16},{wch:14},
+                {wch:18},{wch:16},
+                {wch:20},{wch:20},{wch:18}
+            ];
+
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            for (let R = 1; R <= range.e.r; R++) {
+                ['K','L'].forEach(col => {
+                    const addr = `${col}${R+1}`;
+                    if (ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = '#,##0';
+                });
+            }
+
+            XLSX.utils.book_append_sheet(wb, ws, 'Invoice Management');
+
+            let fname = 'Invoice_Management';
+            if (startDate || endDate) {
+                fname += '_' + (startDate ? fmtD(startDate) : 'awal');
+                fname += '_sd_' + (endDate ? fmtD(endDate) : 'akhir');
+            } else {
+                fname += '_' + fmtD(new Date());
+            }
+            fname += '.xlsx';
+
+            XLSX.writeFile(wb, fname);
+
+        } catch (err) {
+            console.error('Export Excel error:', err);
+            alert('Gagal export Excel: ' + err.message);
         }
     }
 
