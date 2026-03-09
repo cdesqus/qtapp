@@ -555,17 +555,11 @@ class UI {
                             </select>
 
                             <div style="display:flex;align-items:center;gap:5px;">
-                                <div style="position:relative;">
-                                    <i class="fa-solid fa-calendar-days" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.75rem;pointer-events:none;z-index:1;"></i>
-                                    <input type="text" id="inv-date-start" placeholder="Start Date" readonly
-                                        style="padding:7px 8px 7px 28px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;width:120px;cursor:pointer;">
-                                </div>
+                                <input type="text" id="inv-date-start" placeholder="📅 Start Date" readonly
+                                    style="padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;width:130px;cursor:pointer;">
                                 <span style="color:var(--text-secondary);">&#8212;</span>
-                                <div style="position:relative;">
-                                    <i class="fa-solid fa-calendar-days" style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--text-secondary);font-size:0.75rem;pointer-events:none;z-index:1;"></i>
-                                    <input type="text" id="inv-date-end" placeholder="End Date" readonly
-                                        style="padding:7px 8px 7px 28px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;width:120px;cursor:pointer;">
-                                </div>
+                                <input type="text" id="inv-date-end" placeholder="📅 End Date" readonly
+                                    style="padding:7px 10px;border:1px solid var(--border-color);border-radius:6px;background:var(--bg-secondary);color:var(--text-primary);font-size:0.82rem;width:130px;cursor:pointer;">
                                 <button onclick="window.ui.applyInvDateFilter()" class="btn btn-secondary"
                                     style="padding:6px 11px;font-size:0.82rem;display:inline-flex;align-items:center;gap:5px;" title="Filter berdasarkan tanggal">
                                     <i class="fa-solid fa-magnifying-glass"></i> Filter
