@@ -707,7 +707,7 @@ class UI {
                 allowInput: false
             };
             flatpickr('#inv-date-start', { ...fpOpts });
-            flatpickr('#inv-date-end',   { ...fpOpts });
+            flatpickr('#inv-date-end', { ...fpOpts });
 
             // Restore previously chosen dates so filter survives re-renders
             if (window._invDateStart) {
@@ -732,19 +732,19 @@ class UI {
     // ── Apply date-range filter to visible invoice rows ────────────────────
     applyInvDateFilter() {
         const startFp = document.getElementById('inv-date-start')?._flatpickr;
-        const endFp   = document.getElementById('inv-date-end')?._flatpickr;
+        const endFp = document.getElementById('inv-date-end')?._flatpickr;
         const startDate = startFp && startFp.selectedDates[0] ? new Date(startFp.selectedDates[0]) : null;
-        const endDate   = endFp   && endFp.selectedDates[0]   ? new Date(endFp.selectedDates[0])   : null;
+        const endDate = endFp && endFp.selectedDates[0] ? new Date(endFp.selectedDates[0]) : null;
 
         // Persist dates so they survive re-renders
         window._invDateStart = startDate;
-        window._invDateEnd   = endDate;
+        window._invDateEnd = endDate;
 
         const table = document.getElementById('inv-table');
         if (!table) return;
 
         if (startDate) startDate.setHours(0, 0, 0, 0);
-        if (endDate)   endDate.setHours(23, 59, 59, 999);
+        if (endDate) endDate.setHours(23, 59, 59, 999);
 
         table.querySelectorAll('tbody tr').forEach(row => {
             const raw = row.getAttribute('data-quo-date');
@@ -754,7 +754,7 @@ class UI {
             if (isNaN(d)) { row.style.display = ''; return; }
             let show = true;
             if (startDate && d < startDate) show = false;
-            if (endDate   && d > endDate)   show = false;
+            if (endDate && d > endDate) show = false;
             row.style.display = show ? '' : 'none';
         });
     }
@@ -762,11 +762,11 @@ class UI {
     // ── Clear date-range filter ────────────────────────────────────────────
     clearInvDateFilter() {
         window._invDateStart = null;
-        window._invDateEnd   = null;
+        window._invDateEnd = null;
         const startFp = document.getElementById('inv-date-start')?._flatpickr;
-        const endFp   = document.getElementById('inv-date-end')?._flatpickr;
+        const endFp = document.getElementById('inv-date-end')?._flatpickr;
         if (startFp) startFp.clear();
-        if (endFp)   endFp.clear();
+        if (endFp) endFp.clear();
         const table = document.getElementById('inv-table');
         if (table) table.querySelectorAll('tbody tr').forEach(r => r.style.display = '');
     }
@@ -782,12 +782,12 @@ class UI {
             if (!table) { alert('Tabel tidak ditemukan.'); return; }
 
             const startFp = document.getElementById('inv-date-start')?._flatpickr;
-            const endFp   = document.getElementById('inv-date-end')?._flatpickr;
+            const endFp = document.getElementById('inv-date-end')?._flatpickr;
             const startDate = startFp && startFp.selectedDates[0] ? startFp.selectedDates[0] : null;
-            const endDate   = endFp   && endFp.selectedDates[0]   ? endFp.selectedDates[0]   : null;
+            const endDate = endFp && endFp.selectedDates[0] ? endFp.selectedDates[0] : null;
 
             const fmtD = d => d
-                ? `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+                ? `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
                 : '';
 
             // Only export VISIBLE rows (respects both date & status filters)
@@ -807,48 +807,48 @@ class UI {
             ];
 
             const parseIDR = txt => parseInt((txt || '').replace(/[^0-9]/g, ''), 10) || 0;
-            const getText  = el  => el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
+            const getText = el => el ? el.textContent.replace(/\s+/g, ' ').trim() : '';
 
             const dataRows = visibleRows.map(row => {
                 const cells = row.querySelectorAll('td');
 
                 const spans0 = cells[0] ? cells[0].querySelectorAll('span') : [];
-                const quoNum  = spans0[0] ? spans0[0].textContent.trim() : getText(cells[0]);
+                const quoNum = spans0[0] ? spans0[0].textContent.trim() : getText(cells[0]);
                 const quoDate = spans0[1] ? spans0[1].textContent.trim() : '';
 
-                const client   = getText(cells[1]);
-                const poNum    = getText(cells[2]);
-                const doNum    = getText(cells[3]);
-                const doDate   = getText(cells[4]);
-                const bastNum  = getText(cells[5]);
+                const client = getText(cells[1]);
+                const poNum = getText(cells[2]);
+                const doNum = getText(cells[3]);
+                const doDate = getText(cells[4]);
+                const bastNum = getText(cells[5]);
                 const bastDate = getText(cells[6]);
 
                 const spans7 = cells[7] ? cells[7].querySelectorAll('span') : [];
-                const invNum  = spans7[0] ? spans7[0].textContent.trim() : getText(cells[7]);
+                const invNum = spans7[0] ? spans7[0].textContent.trim() : getText(cells[7]);
                 const invDate = spans7[1] ? spans7[1].textContent.trim() : '';
 
                 const selling = parseIDR(getText(cells[8]));
-                const cost    = parseIDR(getText(cells[9]));
-                const status  = getText(cells[10]);
+                const cost = parseIDR(getText(cells[9]));
+                const status = getText(cells[10]);
 
                 return [quoNum, quoDate, client, poNum, doNum, doDate, bastNum, bastDate,
-                        invNum, invDate, selling, cost, status];
+                    invNum, invDate, selling, cost, status];
             });
 
             const wb = XLSX.utils.book_new();
             const ws = XLSX.utils.aoa_to_sheet([headers, ...dataRows]);
 
             ws['!cols'] = [
-                {wch:18},{wch:16},{wch:26},{wch:18},
-                {wch:16},{wch:14},{wch:16},{wch:14},
-                {wch:18},{wch:16},
-                {wch:20},{wch:20},{wch:18}
+                { wch: 18 }, { wch: 16 }, { wch: 26 }, { wch: 18 },
+                { wch: 16 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+                { wch: 18 }, { wch: 16 },
+                { wch: 20 }, { wch: 20 }, { wch: 18 }
             ];
 
             const range = XLSX.utils.decode_range(ws['!ref']);
             for (let R = 1; R <= range.e.r; R++) {
-                ['K','L'].forEach(col => {
-                    const addr = `${col}${R+1}`;
+                ['K', 'L'].forEach(col => {
+                    const addr = `${col}${R + 1}`;
                     if (ws[addr] && typeof ws[addr].v === 'number') ws[addr].z = '#,##0';
                 });
             }
@@ -2176,6 +2176,24 @@ class UI {
             const source = await window.store.getTransaction(sourceId);
             if (!source) return alert('Source transaction not found');
 
+            // ── Guard untuk INV: wajib ada DO atau BAST terlebih dahulu ──────
+            if (targetType === 'INV') {
+                const allTx = window.store.transactions || [];
+                const quoPO = (source.customerPo || source.customer_po || '').trim();
+                if (quoPO) {
+                    const hasLinkedDO   = allTx.some(t => t.type === 'DO'  && (t.customerPo || t.customer_po || '').trim() === quoPO);
+                    const hasLinkedBAST = allTx.some(t => t.type === 'BAP' && (t.customerPo || t.customer_po || '').trim() === quoPO);
+                    if (!hasLinkedDO && !hasLinkedBAST) {
+                        return alert(
+                            '⚠️ Invoice tidak dapat dibuat!\n\n' +
+                            'Harus ada minimal satu Delivery Order (DO) atau BAST\n' +
+                            'yang terhubung dengan PO ini sebelum membuat Invoice.\n\n' +
+                            `PO Number: ${quoPO}`
+                        );
+                    }
+                }
+            }
+
             // Filter items: for DO, only category 'Barang'; for BAP, only category 'Service'
             let sourceItems = (source.items || []);
             if (targetType === 'DO' || targetType === 'BAP') {
@@ -2210,11 +2228,12 @@ class UI {
             const draftTx = {
                 type: targetType,
                 docNumber: newDocNumber,
-                customerPo: source.customerPo || '',
+                customerPo: source.customerPo || source.customer_po || '',
                 date: new Date().toISOString().split('T')[0],
-                clientId: source.clientId,
+                clientId: source.clientId || source.client_id || '',
                 terms: source.terms || '',
                 status: 'Draft',
+                currency: source.currency || 'IDR',
                 items: sourceItems.map(item => ({
                     itemId: item.itemId || item.item_id,
                     category: item.category,
@@ -2381,10 +2400,18 @@ class UI {
                             cost: Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0,
                         });
                     });
+                    const clientIdVal = fd.get('clientId');
+                    if (!clientIdVal) {
+                        return alert('Pilih Client terlebih dahulu sebelum menyimpan Invoice.');
+                    }
+
+                    // Fallback docNumber jika readonly input tidak ter-baca FormData
+                    const docNumVal = fd.get('docNumber') || document.querySelector('#transaction-form input[name="docNumber"]')?.value || window.store.generateNextDocNumber('INV');
+
                     const invMeta = { dueDate: fd.get('dueDate'), attention: fd.get('attention') || '', doRef: fd.get('doRef') || '', bastRef: fd.get('bastRef') || '', refType: fd.get('refType') || 'PO Reference', customNote: fd.get('customNote') || '' };
                     const data = {
-                        type: 'INV', docNumber: fd.get('docNumber'), customerPo: poVal,
-                        date: fd.get('date'), clientId: fd.get('clientId'), status: 'Unpaid', terms: '',
+                        type: 'INV', docNumber: docNumVal, customerPo: poVal,
+                        date: fd.get('date'), clientId: clientIdVal, status: 'Unpaid', terms: '',
                         invoiceNotes: JSON.stringify(invMeta), items, currency: fd.get('currency') || 'IDR'
                     };
                     try {
