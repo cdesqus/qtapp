@@ -473,6 +473,10 @@ app.delete('/api/transactions/:id', authenticate, async (req, res) => {
             if (type === 'QUO' && customer_po && customer_po.trim() !== '') {
                 return res.status(400).json({ error: `Quotation dengan PO Confirmed ("${customer_po}") tidak bisa dihapus.` });
             }
+            // Guard: Only admin can delete Invoice
+            if (type === 'INV' && req.user.role !== 'admin') {
+                return res.status(403).json({ error: 'Hanya admin yang dapat menghapus Invoice.' });
+            }
         }
         await pool.query('DELETE FROM transactions WHERE id = $1', [req.params.id]);
         res.json({ success: true });

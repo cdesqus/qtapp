@@ -676,6 +676,10 @@ class UI {
                                                 onclick="window.ui.editInvoice('${linkedINV.id}')" title="Edit Invoice">
                                                 <i class="fa-solid fa-pen-to-square"></i>
                                             </button>
+                                            <button class="btn btn-sm btn-error" style="font-weight:600;"
+                                                onclick="window.ui.deleteInvoice('${linkedINV.id}', '${linkedINV.docNumber || linkedINV.doc_number || ''}')" title="Hapus Invoice">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
                                             ` : ''}
                                             ` : ''}
                                         </td>
@@ -1950,6 +1954,15 @@ class UI {
             await window.store.updateTransactionStatus(invId, status);
             this.renderInvoiceManagement();
         } catch (err) { alert('Gagal mengubah status: ' + err.message); }
+    }
+
+    async deleteInvoice(invId, docNumber) {
+        const label = docNumber ? `Invoice "${docNumber}"` : 'Invoice ini';
+        if (!confirm(`Hapus ${label}?\n\nTindakan ini tidak dapat dibatalkan.`)) return;
+        try {
+            await window.store.deleteTransaction(invId);
+            this.renderInvoiceManagement();
+        } catch (err) { alert('Gagal menghapus invoice: ' + err.message); }
     }
 
     async setTransactionStatus(txId, status, type) {
