@@ -543,7 +543,8 @@ class UI {
                 const linkedBAST = bastList.find(b => po(b) === po(q) && po(q) !== '');
                 const linkedINV = invList.find(i => po(i) === po(q) && po(q) !== '');
                 const isPaid = linkedINV && (linkedINV.status || '').toLowerCase() === 'paid';
-                const selling = calcSelling(q);
+                // Harga Jual: ambil dari Invoice jika sudah ada (lebih akurat), else dari Quotation
+                const selling = linkedINV ? calcSelling(linkedINV) : calcSelling(q);
                 const cost = calcCost(q);
                 return { q, linkedDO, linkedBAST, linkedINV, isPaid, selling, cost };
             });
