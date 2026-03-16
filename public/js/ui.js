@@ -40,7 +40,10 @@ class UI {
                     const margin = Number(item.margin || 0);
                     const qty = Number(item.qty || 0);
 
-                    const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+                    // Selling price: if cost+margin exists → cost×(1+margin%); if margin=0 → use price explicitly; if no cost → old format price×(1+margin%)
+                    const sellingPrice = (rawCost > 0 && margin > 0)
+                        ? rawCost * (1 + margin / 100)
+                        : (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
                     let amt = sellingPrice * qty;
                     if (tx.currency !== 'USD') amt = Math.round(amt);
 
@@ -520,7 +523,10 @@ class UI {
                 const rawCost = Number(item.cost || 0);
                 const margin = Number(item.margin || 0);
                 const qty = Number(item.qty || 0);
-                const sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+                // Selling price: if cost+margin exists → cost×(1+margin%); if margin=0 → use price explicitly; if no cost → old format price×(1+margin%)
+                const sellingPrice = (rawCost > 0 && margin > 0)
+                    ? rawCost * (1 + margin / 100)
+                    : (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
                 return s + (sellingPrice * qty);
             }, 0);
 

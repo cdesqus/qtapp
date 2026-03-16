@@ -177,9 +177,10 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         const margin = Number(item.margin) || 0;
         const qty = Number(item.qty) || 0;
 
-        // If 'cost' is present, 'price' is the final unit selling price.
-        // Otherwise (legacy), calculate from price (cost) and margin.
-        let sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+        // If cost+margin exists → cost×(1+margin%); if margin=0 → use price explicitly; if no cost → old format price×(1+margin%)
+        let sellingPrice = (rawCost > 0 && margin > 0)
+            ? rawCost * (1 + margin / 100)
+            : (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
         let amount = sellingPrice * qty;
 
         if (tx.currency !== 'USD') {
@@ -251,7 +252,10 @@ function generateQuotationPDF(jsPDF, tx, settings, client) {
         const rawCost = Number(item.cost) || 0;
         const margin = Number(item.margin) || 0;
         const qty = Number(item.qty) || 0;
-        let sellingPrice = (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
+        // If cost+margin exists → cost×(1+margin%); if margin=0 → use price explicitly; if no cost → old format price×(1+margin%)
+        let sellingPrice = (rawCost > 0 && margin > 0)
+            ? rawCost * (1 + margin / 100)
+            : (rawCost > 0) ? rawPrice : (rawPrice * (1 + margin / 100));
         let amount = sellingPrice * qty;
         if (tx.currency !== 'USD') {
             amount = Math.round(amount);
