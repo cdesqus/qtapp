@@ -2275,15 +2275,18 @@ class UI {
                 const getDocNum = t => t.docNumber || t.doc_number || '';
                 const getPO = t => t.customerPo || t.customer_po || '';
 
-                const clientDOs = allTx.filter(t => t.type === 'DO' && getClientId(t) === getClientId(tx));
-                const clientBASTs = allTx.filter(t => t.type === 'BAP' && getClientId(t) === getClientId(tx));
+                const txPO = getPO(tx).trim();
 
-                // Auto-detect by matching PO
-                const autoMatchDO = clientDOs.find(d => getPO(d) === getPO(tx)) || clientDOs[0];
-                const autoMatchBAST = clientBASTs.find(b => getPO(b) === getPO(tx)) || clientBASTs[0];
+                // Filter DO/BAST: harus cocok PO number dengan quotation ini
+                const matchedDOs   = allTx.filter(t => t.type === 'DO'  && getPO(t).trim() === txPO && txPO !== '');
+                const matchedBASTs = allTx.filter(t => t.type === 'BAP' && getPO(t).trim() === txPO && txPO !== '');
 
-                const doOptions = clientDOs.map(d => `<option value="${getDocNum(d)}"   ${autoMatchDO && getDocNum(d) === getDocNum(autoMatchDO) ? 'selected' : ''}>${getDocNum(d)}</option>`).join('');
-                const bastOptions = clientBASTs.map(b => `<option value="${getDocNum(b)}"   ${autoMatchBAST && getDocNum(b) === getDocNum(autoMatchBAST) ? 'selected' : ''}>${getDocNum(b)}</option>`).join('');
+                // Auto-detect: hanya yang benar-benar cocok PO, tidak ada fallback ke item lain
+                const autoMatchDO   = matchedDOs.find(d => getPO(d).trim() === txPO) || null;
+                const autoMatchBAST = matchedBASTs.find(b => getPO(b).trim() === txPO) || null;
+
+                const doOptions   = matchedDOs.map(d => `<option value="${getDocNum(d)}" ${autoMatchDO && getDocNum(d) === getDocNum(autoMatchDO) ? 'selected' : ''}>${getDocNum(d)}</option>`).join('');
+                const bastOptions = matchedBASTs.map(b => `<option value="${getDocNum(b)}" ${autoMatchBAST && getDocNum(b) === getDocNum(autoMatchBAST) ? 'selected' : ''}>${getDocNum(b)}</option>`).join('');
 
                 const hdrS = 'font-weight:600;font-size:0.85rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.05em;';
                 // Items header: WITH Price
