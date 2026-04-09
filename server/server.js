@@ -97,6 +97,7 @@ pool.connect(async (err, client, release) => {
             await client.query(`INSERT INTO currencies (code, name, symbol) VALUES ('IDR', 'Rupiah', 'Rp'), ('USD', 'US Dollar', '$') ON CONFLICT DO NOTHING;`);
             await client.query(`ALTER TABLE products ADD COLUMN IF NOT EXISTS currency TEXT REFERENCES currencies(code) DEFAULT 'IDR';`);
             await client.query(`ALTER TABLE transactions ADD COLUMN IF NOT EXISTS currency TEXT REFERENCES currencies(code) DEFAULT 'IDR';`);
+            await client.query(`ALTER TABLE transaction_items ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0;`);
 
             console.log('✅ Database migrations applied');
         } catch (e) { console.error('Migration warning:', e.message); }
@@ -348,7 +349,8 @@ app.get('/api/transactions', authenticate, async (req, res) => {
             `SELECT ti.*, p.name as item_name, p.description as item_description
              FROM transaction_items ti
              LEFT JOIN products p ON ti.item_id = p.id
-             WHERE ti.transaction_id = ANY($1::uuid[])`,
+             WHERE ti.transaction_id = ANY($1::uuid[])
+             ORDER BY ti.sort_order ASC`,
             [txIds]
         );
 
@@ -402,7 +404,7 @@ app.get('/api/next-doc-number', authenticate, async (req, res) => {
 app.get('/api/transactions/:id', authenticate, async (req, res) => {
     try {
         const tx = await pool.query('SELECT t.*, c.name as client_name FROM transactions t LEFT JOIN clients c ON t.client_id = c.id WHERE t.id = $1', [req.params.id]);
-        const items = await pool.query('SELECT ti.*, p.name as item_name, p.description as item_description FROM transaction_items ti LEFT JOIN products p ON ti.item_id = p.id WHERE ti.transaction_id = $1', [req.params.id]);
+        const items = await pool.query('SELECT ti.*, p.name as item_name, p.description as item_description FROM transaction_items ti LEFT JOIN products p ON ti.item_id = p.id WHERE ti.transaction_id = $1 ORDER BY ti.sort_order ASC', [req.params.id]);
         sendJson(res, { ...tx.rows[0], items: items.rows });
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -433,10 +435,11 @@ app.post('/api/transactions', authenticate, async (req, res) => {
                     [type, finalDocNumber, customerPo, date, clientId || null, terms, status, invoiceNotes || null, projectName || null, currency || 'IDR']
                 );
                 const txId = txResult.rows[0].id;
-                for (const item of items) {
+                for (let i = 0; i < items.length; i++) {
+                    const item = items[i];
                     await client.query(
-                        'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                        [txId, item.itemId || null, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
+                        'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                        [txId, item.itemId || null, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price, i]
                     );
                 }
                 await client.query('COMMIT');
@@ -527,10 +530,11 @@ app.put('/api/transactions/:id', authenticate, async (req, res) => {
 
         await client.query('DELETE FROM transaction_items WHERE transaction_id = $1', [id]);
 
-        for (const item of items) {
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
             await client.query(
-                'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-                [id, item.itemId || item.item_id || null, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price]
+                'INSERT INTO transaction_items (transaction_id, item_id, category, qty, unit, sn, remarks, cost, margin, price, sort_order) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)',
+                [id, item.itemId || item.item_id || null, item.category, item.qty, item.unit, item.sn, item.remarks, item.cost, item.margin, item.price, i]
             );
         }
 

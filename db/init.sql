@@ -59,7 +59,8 @@ CREATE TABLE IF NOT EXISTS transaction_items (
     remarks TEXT,
     cost DECIMAL(15, 2),
     margin DECIMAL(5, 2),
-    price DECIMAL(15, 2) NOT NULL
+    price DECIMAL(15, 2) NOT NULL,
+    sort_order INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS company_settings (
