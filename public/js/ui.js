@@ -1404,9 +1404,10 @@ class UI {
 
             let itemsHeaderHtml, addRowFn;
             if (isDO) {
-                // DO: Category | Product | Qty | Unit | SN | Remarks | âœ•
+                // DO: Category | Product | Qty | Unit | SN | Remarks | ✕
                 itemsHeaderHtml = `
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 30px 100px 3fr 80px 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">No</span>
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -1417,9 +1418,10 @@ class UI {
                     </div>`;
                 addRowFn = 'addDoItemRow';
             } else if (isBAP) {
-                // BAST: Category | Product | Qty | SN | âœ•
+                // BAST: Category | Product | Qty | SN | ✕
                 itemsHeaderHtml = `
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 30px 100px 3fr 80px 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">No</span>
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -1429,7 +1431,8 @@ class UI {
             } else {
                 // QUO/INV: Category | Product | Qty | Unit | Cost Price | Margin % | Harga Jual | Remarks | ✕
                 itemsHeaderHtml = `
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 30px 120px 3fr 80px 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">No</span>
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -1674,7 +1677,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '120px 3fr 80px 80px 140px 90px 140px 2fr 40px';
+        row.style.gridTemplateColumns = '30px 120px 3fr 80px 80px 140px 90px 140px 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -1703,6 +1706,7 @@ class UI {
         }
 
         row.innerHTML = `
+            <span class="item-nr" style="font-weight:bold; text-align:center; color:var(--text-secondary); font-size:0.9rem;"></span>
             <select name="items[${idx}][category]" onchange="window.ui.onCategoryChange(${idx})" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
                 <option value="Barang" ${activeCat === 'Barang' ? 'selected' : ''}>Barang</option>
                 <option value="Service" ${activeCat === 'Service' ? 'selected' : ''}>Service</option>
@@ -1733,9 +1737,10 @@ class UI {
                 title="Harga Jual per unit. Isi Margin untuk auto-hitung, atau kosongkan Margin lalu isi harga jual per unit langsung."
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; ${(item && item.margin != null && item.margin !== '') ? 'background: rgba(99,102,241,0.07); color: var(--text-secondary);' : 'background: white;'}">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
-            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
+            <button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeItemRow(this)" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);
+        this.updateItemNumbers();
 
         // Close dropdown when clicking outside
         document.addEventListener('click', (e) => {
@@ -2047,7 +2052,8 @@ class UI {
                     </div>
                     
                     <h4 style="margin-top: 25px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 30px 120px 3fr 80px 140px 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">No</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Category</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Product</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Qty</span>
@@ -2429,7 +2435,8 @@ class UI {
 
             let itemsHeader;
             if (isDO) {
-                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 30px 100px 3fr 80px 2fr 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">No</span>
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -2438,7 +2445,8 @@ class UI {
                         <span></span>
                    </div>`;
             } else if (isBAP) {
-                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 100px 3fr 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 30px 100px 3fr 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">No</span>
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -2446,7 +2454,8 @@ class UI {
                         <span></span>
                    </div>`;
             } else {
-                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 120px 3fr 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                itemsHeader = `<div class="tx-items-header" style="display: grid; grid-template-columns: 30px 120px 3fr 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                        <span style="${headerStyle}">No</span>
                         <span style="${headerStyle}">Category</span>
                         <span style="${headerStyle}">Product</span>
                         <span style="${headerStyle}">Qty</span>
@@ -2619,7 +2628,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '100px 3fr 80px 80px 2fr 2fr 40px';
+        row.style.gridTemplateColumns = '30px 100px 3fr 80px 80px 2fr 2fr 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -2631,6 +2640,7 @@ class UI {
         const unitOptions = (window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr']).map(u => `<option value="${u}" ${u === activeUnit ? 'selected' : ''}>${u}</option>`).join('');
 
         row.innerHTML = `
+            <span class="item-nr" style="font-weight:bold; text-align:center; color:var(--text-secondary); font-size:0.9rem;"></span>
             <select name="items[${idx}][category]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f1f5f9; cursor:not-allowed;" disabled>
                 <option value="Barang" selected>Barang</option>
             </select>
@@ -2650,9 +2660,10 @@ class UI {
             </select>
             <input type="text" name="items[${idx}][sn]" value="${item ? item.sn || '' : ''}" placeholder="Serial Number" style="${inputStyle}">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
-            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
+            <button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeItemRow(this)" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);
+        this.updateItemNumbers();
 
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById(`product-dropdown-${idx}`);
@@ -2679,7 +2690,7 @@ class UI {
         const row = document.createElement('div');
         row.className = 'tx-item-row';
         row.style.display = 'grid';
-        row.style.gridTemplateColumns = '100px 3fr 80px 40px';
+        row.style.gridTemplateColumns = '30px 100px 3fr 80px 40px';
         row.style.gap = '10px';
         row.style.marginBottom = '8px';
         row.style.alignItems = 'center';
@@ -2688,6 +2699,7 @@ class UI {
         const inputStyle = 'width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;';
 
         row.innerHTML = `
+            <span class="item-nr" style="font-weight:bold; text-align:center; color:var(--text-secondary); font-size:0.9rem;"></span>
             <select name="items[${idx}][category]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: #f1f5f9; cursor:not-allowed;" disabled>
                 <option value="Service" selected>Service</option>
             </select>
@@ -2702,9 +2714,10 @@ class UI {
                 <div id="product-dropdown-${idx}" style="display:none; position:absolute; top:100%; left:0; right:0; z-index:100; background:var(--card-bg); border:1px solid var(--border-color); border-radius: 6px; max-height: 200px; overflow-y:auto; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
             <input type="number" name="items[${idx}][qty]" value="${item ? item.qty : 1}" placeholder="Qty" required style="${inputStyle} text-align: center;">
-            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
+            <button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeItemRow(this)" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
         container.appendChild(row);
+        this.updateItemNumbers();
 
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById(`product-dropdown-${idx}`);
@@ -2749,7 +2762,7 @@ class UI {
 
         const row = document.createElement('div');
         row.className = 'tx-item-row';
-        row.style.cssText = 'display:grid;grid-template-columns:120px 3fr 80px 140px 80px 2fr 40px;gap:10px;margin-bottom:8px;align-items:center;';
+        row.style.cssText = 'display:grid;grid-template-columns:30px 120px 3fr 80px 140px 80px 2fr 40px;gap:10px;margin-bottom:8px;align-items:center;';
         row.dataset.index = idx;
 
         const inputStyle = 'width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.9rem;';
@@ -2757,6 +2770,7 @@ class UI {
         const catOptions = ['Barang', 'Service'].map(c => `<option value="${c}" ${catVal === c ? 'selected' : ''}>${c}</option>`).join('');
 
         row.innerHTML = `
+            <span class="item-nr" style="font-weight:bold; text-align:center; color:var(--text-secondary); font-size:0.9rem;"></span>
             <select name="items[${idx}][category]" style="${inputStyle}font-size:0.85rem;">${catOptions}</select>
             <div style="position:relative;">
                 <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
@@ -2772,9 +2786,10 @@ class UI {
             <input type="number" name="items[${idx}][price]"   value="${priceVal}" placeholder="Price" style="${inputStyle}text-align:right;">
             <select name="items[${idx}][unit]" style="${inputStyle}font-size:0.85rem;">${unitOptions}</select>
             <input type="text"   name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inputStyle}">
-            <button type="button" class="btn btn-sm btn-error" onclick="this.parentElement.remove()" style="padding:6px 10px;font-size:1rem;">&times;</button>
+            <button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeItemRow(this)" style="padding:6px 10px;font-size:1rem;">&times;</button>
         `;
         container.appendChild(row);
+        this.updateItemNumbers();
 
         document.addEventListener('click', (e) => {
             const dropdown = document.getElementById(`product-dropdown-${idx}`);
@@ -2837,6 +2852,19 @@ class UI {
             alert('❌ Gagal menghapus: ' + err.message);
             if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-trash-can"></i> Hapus Data Transaksi'; }
         }
+    }
+
+    removeItemRow(btn) {
+        btn.parentElement.remove();
+        this.updateItemNumbers();
+    }
+
+    updateItemNumbers() {
+        const rows = document.querySelectorAll('.tx-item-row');
+        rows.forEach((row, idx) => {
+            const nrSpan = row.querySelector('.item-nr');
+            if (nrSpan) nrSpan.textContent = idx + 1;
+        });
     }
 }
 
