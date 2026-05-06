@@ -1725,17 +1725,17 @@ class UI {
             <select name="items[${idx}][unit]" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.85rem; background: white; cursor: pointer;">
                 ${unitOptions}
             </select>
-            <input type="number" name="items[${idx}][price]" value="${initCost}" placeholder="Cost Price" required
+            <input type="number" name="items[${idx}][price]" value="${initCost}" placeholder="Cost Price" required step="any"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 title="Cost Price: harga pokok produk/service"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
-            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="0.5"
+            <input type="number" name="items[${idx}][margin]" value="${item && item.margin != null ? item.margin : ''}" placeholder="%" min="0" step="any"
                 oninput="window.ui.syncAmountFromMargin(${idx})"
                 style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; text-align: center;">
-            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Harga Jual/unit"
+            <input type="number" name="items[${idx}][amount]" value="${initAmount}" placeholder="Harga Jual/unit" step="any"
                 oninput="window.ui.syncMarginFromAmount(${idx})"
                 title="Harga Jual per unit. Isi Margin untuk auto-hitung, atau kosongkan Margin lalu isi harga jual per unit langsung."
-                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; ${(item && item.margin != null && item.margin !== '') ? 'background: rgba(99,102,241,0.07); color: var(--text-secondary);' : 'background: white;'}">
+                style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem; ${(item && item.margin != null && item.margin !== '' && Number(item.margin) !== 0) ? 'background: rgba(99,102,241,0.07); color: var(--text-secondary);' : 'background: white;'}">
             <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="width:100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 6px; font-size: 0.9rem;">
             <button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeItemRow(this)" style="padding: 6px 10px; font-size: 1rem;">&times;</button>
         `;
@@ -2537,9 +2537,9 @@ class UI {
                             remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
                             category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
                             unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
-                            price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                            price: Number((row.querySelector(`input[name="items[${idx}][price]"]`)?.value || '').replace(/,/g, '')) || 0,
                             margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
-                            cost: Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0,
+                            cost: Number((row.querySelector(`input[name="items[${idx}][cost]"]`)?.value || '').replace(/,/g, '')) || 0,
                         });
                     });
                     const clientIdVal = fd.get('clientId');
