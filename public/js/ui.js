@@ -2168,12 +2168,12 @@ class UI {
         if (item) {
             if (item.cost && item.price) {
                 // New schema: price = selling price per unit
-                initAmount = Math.round(initPrice);
+                initAmount = initPrice;
             } else if (initMargin !== '' && initPrice > 0) {
                 // Legacy: price was cost, compute selling from margin
-                initAmount = Math.round(initPrice * (1 + Number(initMargin) / 100));
+                initAmount = initPrice * (1 + Number(initMargin) / 100);
             } else {
-                initAmount = Math.round(initPrice);
+                initAmount = initPrice;
             }
         }
 
@@ -2199,14 +2199,14 @@ class UI {
                 oninput="window.ui.invSyncAmount(${idx})"
                 style="${inpStyle}text-align:center;">
             <select name="items[${idx}][unit]" style="${selStyle}">${unitOptions}</select>
-            <input type="number" name="items[${idx}][cost]" value="${initCost}" placeholder="Cost Price"
+            <input type="number" name="items[${idx}][cost]" value="${initCost}" placeholder="Cost Price" step="any"
                 oninput="window.ui.invSyncAmount(${idx})"
                 title="Cost Price: harga pokok produk/service"
                 style="${inpStyle}">
             <input type="number" name="items[${idx}][margin]" value="${initMargin}" placeholder="%" min="0" step="0.5"
                 oninput="window.ui.invSyncAmount(${idx})"
                 style="${inpStyle}text-align:center;">
-            <input type="number" name="items[${idx}][price]" value="${initAmount}" placeholder="Harga Jual/unit"
+            <input type="number" name="items[${idx}][price]" value="${initAmount}" placeholder="Harga Jual/unit" step="any"
                 oninput="window.ui.invSyncMarginFromPrice(${idx})"
                 title="Harga Jual per unit. Isi Margin untuk auto-hitung (Cost × (1+Margin%)), atau kosongkan Margin dan isi langsung."
                 style="${inpStyle}${marginHasValue ? 'background:rgba(99,102,241,0.07);color:var(--text-secondary);' : ''}">
@@ -2236,7 +2236,7 @@ class UI {
         const priceEl = row.querySelector(`input[name="items[${idx}][price]"]`);
         if (!priceEl) return;
         if (margin !== '') {
-            priceEl.value = Math.round(cost * (1 + Number(margin) / 100));
+            priceEl.value = cost * (1 + Number(margin) / 100);
             priceEl.style.background = 'rgba(99,102,241,0.07)';
             priceEl.style.color = 'var(--text-secondary)';
             priceEl.title = 'Harga Jual per unit dihitung otomatis: Cost × (1 + Margin%)';
