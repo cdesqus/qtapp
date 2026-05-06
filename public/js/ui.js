@@ -2161,7 +2161,7 @@ class UI {
         const initCost   = item ? Number(item.cost || item.price || 0) : 0;
         const initPrice  = item ? Number(item.price || 0) : 0;
         const initQty    = item ? (item.qty || 1) : 1;
-        const initMargin = (item && item.margin != null) ? item.margin : '';
+        const initMargin = (item && item.margin != null && Number(item.margin) !== 0) ? item.margin : '';
 
         // Harga Jual field initial value
         let initAmount = '';
@@ -2235,7 +2235,7 @@ class UI {
         const margin = marginEl ? marginEl.value : '';
         const priceEl = row.querySelector(`input[name="items[${idx}][price]"]`);
         if (!priceEl) return;
-        if (margin !== '') {
+        if (margin !== '' && Number(margin) > 0) {
             priceEl.value = cost * (1 + Number(margin) / 100);
             priceEl.style.background = 'rgba(99,102,241,0.07)';
             priceEl.style.color = 'var(--text-secondary)';
