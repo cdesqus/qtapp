@@ -2090,9 +2090,9 @@ class UI {
                         remarks: row.querySelector(`input[name="items[${idx}][remarks]"]`)?.value || '',
                         category: row.querySelector(`select[name="items[${idx}][category]"]`)?.value || 'Barang',
                         unit: row.querySelector(`select[name="items[${idx}][unit]"]`)?.value || 'Pcs',
-                        price: Number(row.querySelector(`input[name="items[${idx}][price]"]`)?.value) || 0,
+                        price: Number((row.querySelector(`input[name="items[${idx}][price]"]`)?.value || '').replace(/,/g, '')) || 0,
                         margin: Number(row.querySelector(`input[name="items[${idx}][margin]"]`)?.value) || 0,
-                        cost: Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0,
+                        cost: Number((row.querySelector(`input[name="items[${idx}][cost]"]`)?.value || '').replace(/,/g, '')) || 0,
                     });
                 });
 
@@ -2195,18 +2195,18 @@ class UI {
                 <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
                 <div id="product-dropdown-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
             </div>
-            <input type="number" name="items[${idx}][qty]" value="${initQty}" placeholder="Qty" required
+            <input type="number" name="items[${idx}][qty]" value="${initQty}" placeholder="Qty" required step="any"
                 oninput="window.ui.invSyncAmount(${idx})"
                 style="${inpStyle}text-align:center;">
             <select name="items[${idx}][unit]" style="${selStyle}">${unitOptions}</select>
-            <input type="number" name="items[${idx}][cost]" value="${initCost}" placeholder="Cost Price" step="any"
+            <input type="text" inputmode="decimal" name="items[${idx}][cost]" value="${initCost}" placeholder="Cost Price"
                 oninput="window.ui.invSyncAmount(${idx})"
                 title="Cost Price: harga pokok produk/service"
                 style="${inpStyle}">
-            <input type="number" name="items[${idx}][margin]" value="${initMargin}" placeholder="%" min="0" step="0.5"
+            <input type="number" name="items[${idx}][margin]" value="${initMargin}" placeholder="%" min="0" step="any"
                 oninput="window.ui.invSyncAmount(${idx})"
                 style="${inpStyle}text-align:center;">
-            <input type="number" name="items[${idx}][price]" value="${initAmount}" placeholder="Harga Jual/unit" step="any"
+            <input type="text" inputmode="decimal" name="items[${idx}][price]" value="${initAmount}" placeholder="Harga Jual/unit"
                 oninput="window.ui.invSyncMarginFromPrice(${idx})"
                 title="Harga Jual per unit. Isi Margin untuk auto-hitung (Cost × (1+Margin%)), atau kosongkan Margin dan isi langsung."
                 style="${inpStyle}${marginHasValue ? 'background:rgba(99,102,241,0.07);color:var(--text-secondary);' : ''}">
@@ -2230,13 +2230,14 @@ class UI {
     invSyncAmount(idx) {
         const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
         if (!row) return;
-        const cost = Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0;
+        const cost = Number((row.querySelector(`input[name="items[${idx}][cost]"]`)?.value || '').replace(/,/g, '')) || 0;
         const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
         const margin = marginEl ? marginEl.value : '';
         const priceEl = row.querySelector(`input[name="items[${idx}][price]"]`);
         if (!priceEl) return;
         if (margin !== '' && Number(margin) > 0) {
-            priceEl.value = cost * (1 + Number(margin) / 100);
+            const computed = cost * (1 + Number(margin) / 100);
+            priceEl.value = parseFloat(computed.toFixed(4));
             priceEl.style.background = 'rgba(99,102,241,0.07)';
             priceEl.style.color = 'var(--text-secondary)';
             priceEl.title = 'Harga Jual per unit dihitung otomatis: Cost × (1 + Margin%)';
