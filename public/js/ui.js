@@ -2052,13 +2052,15 @@ class UI {
                     </div>
                     
                     <h4 style="margin-top: 25px; margin-bottom: 10px;">Items</h4>
-                    <div class="tx-items-header" style="display: grid; grid-template-columns: 30px 120px 3fr 80px 140px 80px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
+                    <div class="tx-items-header" style="display: grid; grid-template-columns: 30px 120px 3fr 80px 80px 140px 90px 140px 2fr 40px; gap: 10px; padding: 8px 0; border-bottom: 2px solid var(--border-color); margin-bottom: 8px;">
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">No</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Category</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Product</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Qty</span>
-                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Price</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Unit</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;" title="Cost Price: harga pokok">Cost Price</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Margin %</span>
+                        <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;" title="Harga Jual per unit">Harga Jual</span>
                         <span style="font-weight: 600; font-size: 0.85rem; color: var(--text-secondary); text-transform: uppercase;">Remarks</span>
                         <span></span>
                     </div>
@@ -2123,7 +2125,137 @@ class UI {
         } catch (err) { alert('Gagal membuka editor Invoice: ' + err.message); }
     }
 
+    // ── Invoice edit: add editable item row with Cost Price / Margin% / Harga Jual ──
+    addInvItemRow(item = null) {
+        const container = document.getElementById('tx-items-container');
+        if (!container) return;
+        const idx = this.currentItemIndex++;
 
+        // Resolve product name / category / id
+        let productName = '';
+        let productCategory = '';
+        let productId = '';
+        if (item) {
+            const pid = item.itemId || item.item_id;
+            productId = pid || '';
+            const found = (window.store.products || []).find(p => p.id === pid);
+            if (found) {
+                productName = found.name;
+                productCategory = found.category || item.category || '';
+            } else {
+                productCategory = item.category || '';
+            }
+        }
+
+        const row = document.createElement('div');
+        row.className = 'tx-item-row';
+        row.style.cssText = 'display:grid;grid-template-columns:30px 120px 3fr 80px 80px 140px 90px 140px 2fr 40px;gap:10px;margin-bottom:8px;align-items:center;';
+        row.dataset.index = idx;
+
+        const activeCat  = productCategory || 'Barang';
+        const activeUnit = (item ? item.unit : '') || 'Pcs';
+        const unitOptions = (window.store.units || ['Pcs', 'Unit', 'Lot', 'Kg', 'Mtr'])
+            .map(u => `<option value="${u}" ${u === activeUnit ? 'selected' : ''}>${u}</option>`).join('');
+
+        // Values — item.cost = cost price, item.price = harga jual per unit
+        const initCost   = item ? Number(item.cost || item.price || 0) : 0;
+        const initPrice  = item ? Number(item.price || 0) : 0;
+        const initQty    = item ? (item.qty || 1) : 1;
+        const initMargin = (item && item.margin != null) ? item.margin : '';
+
+        // Harga Jual field initial value
+        let initAmount = '';
+        if (item) {
+            if (item.cost && item.price) {
+                // New schema: price = selling price per unit
+                initAmount = Math.round(initPrice);
+            } else if (initMargin !== '' && initPrice > 0) {
+                // Legacy: price was cost, compute selling from margin
+                initAmount = Math.round(initPrice * (1 + Number(initMargin) / 100));
+            } else {
+                initAmount = Math.round(initPrice);
+            }
+        }
+
+        const inpStyle = 'width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:6px;font-size:0.9rem;';
+        const selStyle = inpStyle + 'background:white;cursor:pointer;';
+        const marginHasValue = initMargin !== '' && initMargin != null;
+
+        row.innerHTML = `
+            <span class="item-nr" style="font-weight:bold;text-align:center;color:var(--text-secondary);font-size:0.9rem;"></span>
+            <select name="items[${idx}][category]" style="${selStyle}">
+                <option value="Barang" ${activeCat === 'Barang' ? 'selected' : ''}>Barang</option>
+                <option value="Service" ${activeCat === 'Service' ? 'selected' : ''}>Service</option>
+            </select>
+            <div style="position:relative;">
+                <input type="text" name="items[${idx}][search]" value="${productName}" placeholder="Search product..." autocomplete="off"
+                    oninput="window.ui.onProductSearch(this, ${idx})"
+                    onfocus="window.ui.onProductSearch(this, ${idx})"
+                    style="${inpStyle}">
+                <input type="hidden" name="items[${idx}][itemId]" value="${productId}">
+                <div id="product-dropdown-${idx}" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:var(--card-bg);border:1px solid var(--border-color);border-radius:6px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.15);"></div>
+            </div>
+            <input type="number" name="items[${idx}][qty]" value="${initQty}" placeholder="Qty" required
+                oninput="window.ui.invSyncAmount(${idx})"
+                style="${inpStyle}text-align:center;">
+            <select name="items[${idx}][unit]" style="${selStyle}">${unitOptions}</select>
+            <input type="number" name="items[${idx}][cost]" value="${initCost}" placeholder="Cost Price"
+                oninput="window.ui.invSyncAmount(${idx})"
+                title="Cost Price: harga pokok produk/service"
+                style="${inpStyle}">
+            <input type="number" name="items[${idx}][margin]" value="${initMargin}" placeholder="%" min="0" step="0.5"
+                oninput="window.ui.invSyncAmount(${idx})"
+                style="${inpStyle}text-align:center;">
+            <input type="number" name="items[${idx}][price]" value="${initAmount}" placeholder="Harga Jual/unit"
+                oninput="window.ui.invSyncMarginFromPrice(${idx})"
+                title="Harga Jual per unit. Isi Margin untuk auto-hitung (Cost × (1+Margin%)), atau kosongkan Margin dan isi langsung."
+                style="${inpStyle}${marginHasValue ? 'background:rgba(99,102,241,0.07);color:var(--text-secondary);' : ''}">
+            <input type="text" name="items[${idx}][remarks]" value="${item ? item.remarks || '' : ''}" placeholder="Remarks" style="${inpStyle}">
+            <button type="button" class="btn btn-sm btn-error" onclick="window.ui.removeItemRow(this)" style="padding:6px 10px;font-size:1rem;">&times;</button>
+        `;
+        container.appendChild(row);
+        this.updateItemNumbers();
+
+        // Close dropdown on outside click
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById(`product-dropdown-${idx}`);
+            if (dropdown && !row.contains(e.target)) dropdown.style.display = 'none';
+        });
+
+        // Initial sync styling
+        this.invSyncAmount(idx);
+    }
+
+    // Sync Harga Jual when Cost / Margin changes
+    invSyncAmount(idx) {
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        if (!row) return;
+        const cost = Number(row.querySelector(`input[name="items[${idx}][cost]"]`)?.value) || 0;
+        const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
+        const margin = marginEl ? marginEl.value : '';
+        const priceEl = row.querySelector(`input[name="items[${idx}][price]"]`);
+        if (!priceEl) return;
+        if (margin !== '') {
+            priceEl.value = Math.round(cost * (1 + Number(margin) / 100));
+            priceEl.style.background = 'rgba(99,102,241,0.07)';
+            priceEl.style.color = 'var(--text-secondary)';
+            priceEl.title = 'Harga Jual per unit dihitung otomatis: Cost × (1 + Margin%)';
+        } else {
+            priceEl.style.background = 'white';
+            priceEl.style.color = '';
+            priceEl.title = 'Margin dikosongkan — isi Harga Jual per unit langsung';
+        }
+    }
+
+    // Sync Margin when Harga Jual is edited directly
+    invSyncMarginFromPrice(idx) {
+        const row = document.querySelector(`.tx-item-row[data-index="${idx}"]`);
+        if (!row) return;
+        const marginEl = row.querySelector(`input[name="items[${idx}][margin]"]`);
+        if (marginEl) marginEl.value = '';
+        const priceEl = row.querySelector(`input[name="items[${idx}][price]"]`);
+        if (priceEl) { priceEl.style.background = 'white'; priceEl.style.color = ''; }
+    }
 
 
     async printTransaction(id) {
